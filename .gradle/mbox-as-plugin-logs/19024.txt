@@ -1,0 +1,4 @@
+DEBUG [CommandLine-/Users/bytedance/study/BernieJiang.github.io] Execute cmd(`git remote -v`) in dir /Users/bytedance/study/BernieJiang.github.io.log start  **************
+DEBUG [CommandLine-/Users/bytedance/study/BernieJiang.github.io] Execute cmd(`git remote -v`) in dir /Users/bytedance/study/BernieJiang.github.io.log end.exitCode:0 result:origin	https://github.com/Bernie-sw-jiang/BernieJiang.github.io.git (fetch)
+origin	https://github.com/Bernie-sw-jiang/BernieJiang.github.io.git (push)
+**************
