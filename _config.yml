@@ -23,7 +23,7 @@ texture:
 
   # generate social links in footer
   social_links:
-    github: https://github.com/Bernie-sw-jiang
+    github: Bernie-sw-jiang
  
 
 # If you want to link only specific pages in your header, uncomment
