@@ -285,7 +285,7 @@ private class MyFrameCallbackProvider implements AnimationFrameCallbackProvider 
 }
 ```
 
-`getProvider()`方法会得到一个`AnimationHandler`的内部类`MyFrameCallbackProvider`，其实就是负责与`Choreographer`交互的中间人，那么`Choreographer`是什么呢？这里先简单介绍下，`Choreographer`是android系统中所有动画和绘制的管理者，以接近恒定的16.6ms(60HZ)为通知上层做绘制操作。介于篇幅有限，这里先略过`Choreographer`实现原理，先把主流程走完，我们将在[Android属性动画原理(二)-Choreographer](2022-02-03-Android属性动画原理(二)-Choreographer.markdown)中详细介绍`Choreographer`。
+`getProvider()`方法会得到一个`AnimationHandler`的内部类`P`，其实就是负责与`Choreographer`交互的中间人，那么`Choreographer`是什么呢？这里先简单介绍下，`Choreographer`是android系统中所有动画和绘制的管理者，以接近恒定的16.6ms(60HZ)为通知上层做绘制操作。介于篇幅有限，这里先略过`Choreographer`实现原理，先把主流程走完，我们将在[Android属性动画原理(二)-Choreographer](2022-02-03-Android属性动画原理(二)-Choreographer.markdown)中详细介绍`Choreographer`。
 
 ```java
 // AnimationHandler
@@ -433,8 +433,9 @@ public float getFloatValue(float fraction) {
 5. `ValueAnimator`根据`Choreographer`通知的当前时间计算出当前动画应该执行到的位置`fraction`
 6. `ValueAnimator`内部的`PropertyValuesHolder`根据`fraction`计算出动画当前的值
 7. `ValueAnimator`通过`AnimatorUpdateListener.onAnimationUpdate()`通知外部
+7. 重复2
 
-![ValueAnimator](../assets/img/ValueAnimator.jpg)
+![ValueAnimator](../assets/img/ValueAnimator1.png)
 
 `addAnimationCallback()`方法到此结束，下面我们再看一下`ValueAnimator.start()`方法中调用的另外两个方法。
 
