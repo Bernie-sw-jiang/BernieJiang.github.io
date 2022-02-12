@@ -1,6 +1,9 @@
+---
 layout: post
 title:  "Android属性动画原理分析"
 date:   2022-02-02
+---
+Android属性动画原理分析
 
 
 
