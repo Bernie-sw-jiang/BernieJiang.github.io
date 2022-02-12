@@ -3,7 +3,8 @@ layout: post
 title:  "Android属性动画原理分析(一)-ValueAnimator"
 date:   2022-02-02
 ---
-              
+源码角度分析ValueAnimator内部实现原理   
+
 
 
 # 介绍
