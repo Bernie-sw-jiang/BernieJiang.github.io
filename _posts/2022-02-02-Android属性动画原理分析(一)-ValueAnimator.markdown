@@ -435,7 +435,7 @@ public float getFloatValue(float fraction) {
 7. `ValueAnimator`通过`AnimatorUpdateListener.onAnimationUpdate()`通知外部
 7. 重复2
 
-![ValueAnimator](../assets/img/ValueAnimator1.png)
+![ValueAnimator](../images/ValueAnimator1.png)
 
 `addAnimationCallback()`方法到此结束，下面我们再看一下`ValueAnimator.start()`方法中调用的另外两个方法。
 
