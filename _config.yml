@@ -16,6 +16,8 @@ permalink: /posts/:title/
 texture:
   title: Android学习小记
   tagline: BernieJiang
+    字节跳动音乐团队一年半安卓练习生，内推可发简历至jiangshiwei@bytedance.com
+    给岁月以文明，给时光以生命
   date_format: "%b %-d, %Y"
   style: black
   showNav: false
