@@ -1,10 +1,9 @@
 ---
 layout: post
-title:  "Android属性动画原理分析"
+title:  "Android属性动画原理分析(一)-ValueAnimator"
 date:   2022-02-02
 ---
-Android属性动画原理分析
-
+              
 
 
 # 介绍
@@ -262,7 +261,7 @@ public class AnimationHandler {
 继续往下，`AnimationHandler.addAnimationFrameCallback()`做了三件事：
 
 1. 如果`mAnimationCallbacks`长度为0，调用`getProvider().postFrameCallback(mFrameCallback)`
-2. 将实现了`AnimationFrameCallback`接口的callback添加进mAnimationCallbacks 
+2. 将实现了`AnimationFrameCallback`接口的`callback`添加进`mAnimationCallbacks` 
 3. 如果`delay` > 0,将`callback - (SystemClock.uptimeMillis() + delay)`键值对添加进`mDelayedCallbackStartTime`中
 
 ```java
@@ -501,9 +500,9 @@ public final boolean doAnimationFrame(long frameTime) {
 }
 ```
 
-首先，在满足条件`mStartTime < 0`即触发`ValueAnimator.start()`后第一次收到`AnimationHandler`回调时会进入`代码1`，`代码1`中`mStartTime`是只有在`mReversing == false`的情况下，才会将`mStartDelay`加入`mStartTime`,如果`mReversing == true`则`mStartTime`为参数`frameTime`。
+首先，在满足条件`mStartTime < 0`即调用`ValueAnimator.start()`后第一次收到`AnimationHandler`回调时会进入`代码1`，`代码1`中`mStartTime`是只有在`mReversing == false`的情况下，才会将`mStartDelay`加入`mStartTime`,如果`mReversing == true`则`mStartTime`为参数`frameTime`。
 
-其次，在满足条件`mRunning == false`即动画还没有真正开始执行时会进去`代码2`，`代码2`中只有同时满足条件`mStartTime > frameTime`和`mSeekFraction == -1`时才会直接返回，如果任一条件不满足，便会触发`startAnimation()`并开始运行动画计算值。
+其次，在满足条件`mRunning == false`即动画还没有真正开始执行时会进`代码2`，`代码2`中只有同时满足条件`mStartTime > frameTime`和`mSeekFraction == -1`时才会直接返回，如果任一条件不满足，便会触发`startAnimation()`并开始运行动画计算值。
 
 
 
@@ -590,3 +589,5 @@ public void setCurrentFraction(float fraction) {
 ```
 
 可以看到无论是`setCurrentPlayTime()`还是`setCurrentFraction()`和之前`animateBasedOnTime()`的原理是一样的，都是先根据时间算出`fraction`，然后`PropertyValuesHolder`根据`fraction`算出动画值，并通过AnimatorUpdateListener.onAnimationUpdate()通知外部。
+
+# 总结
