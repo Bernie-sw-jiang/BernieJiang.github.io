@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "2022-02-12-Android属性动画原理(二)-Choreographer"
+title:  "2022-02-12-Android属性动画(二)-Choreographer"
 date:   2022-02-12
 ---
 Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
