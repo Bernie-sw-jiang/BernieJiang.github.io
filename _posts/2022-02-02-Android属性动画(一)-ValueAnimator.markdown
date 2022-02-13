@@ -9,7 +9,7 @@ tags: [Android动画]
 
 
 
-# 介绍
+## 介绍
 
 属性动画系统是一个强健的框架，用于为几乎任何内容添加动画效果。您可以定义一个随时间更改任何对象属性的动画，无论其是否绘制到屏幕上。属性动画会在指定时长内更改属性（对象中的字段）的值。要添加动画效果，请指定要添加动画效果的对象属性，例如对象在屏幕上的位置、动画效果持续多长时间以及要在哪些值之间添加动画效果。
 
@@ -21,7 +21,7 @@ tags: [Android动画]
 - Animator 集：您可以将动画分成多个逻辑集，它们可以一起播放、按顺序播放或者在指定的延迟时间后播放。
 - 帧刷新延迟：您可以指定动画帧的刷新频率。默认设置为每 10 毫秒刷新一次，但应用刷新帧的速度最终取决于整个系统的繁忙程度以及系统为底层计时器提供服务的速度。
 
-# 简单使用
+## 简单使用
 
 ```kotlin
 ValueAnimator.ofFloat(1f, 0f).apply {
@@ -48,9 +48,9 @@ ValueAnimator.ofFloat(1f, 0f).apply {
 
 对于上述代码来说，Android开发同学应该再熟悉不过了，下面就以上述代码为出发点一窥属性动画的内部实现原理。
 
-# 源码分析
+## 源码分析
 
-## `ofFloat`
+### `ofFloat`
 
 从`ValueAnimator.ofFloat(1f, 0f)`看起
 
@@ -179,7 +179,7 @@ static class FloatKeyframe extends Keyframe {
 
 回过头继续看我们的demo,`ValueAnimator.setDuration()`, `setInterpolator()`, `addUpdateListener()`, `addListener()`都仅仅是在内部记了个变量，我们重点看下`ValueAnimator.start()`方法。
 
-## `start`
+### `start`
 
 ```java
 @Override
@@ -214,7 +214,7 @@ private void start(boolean playBackwards) {
 2. `startAnimation()`
 3. `setCurrentPlayTime(0)`/`setCurrentFraction(mSeekFraction)`
 
-###   `addAnimationCallback()`
+####   `addAnimationCallback()`
 
 ```java
 private void addAnimationCallback(long delay) {
@@ -441,7 +441,7 @@ public float getFloatValue(float fraction) {
 
 `addAnimationCallback()`方法到此结束，下面我们再看一下`ValueAnimator.start()`方法中调用的另外两个方法。
 
-### `startAnimation()`
+#### `startAnimation()`
 
 ```java
 private void start(boolean playBackwards) {
@@ -553,7 +553,7 @@ void init() {
 
 `startAnimation()`比较简单，仅做了一些初始化操作，标记动画已经开始运行了，并调用AnimatorListener.onAnimationStart()通知外部。
 
-### `setCurrentPlayTime()`/`setCurrentFraction()`
+#### `setCurrentPlayTime()`/`setCurrentFraction()`
 
 ```java
 // ValueAnimator
@@ -594,7 +594,7 @@ public void setCurrentFraction(float fraction) {
 
 可以看到无论是`setCurrentPlayTime()`还是`setCurrentFraction()`和之前`animateBasedOnTime()`的原理是一样的，都是先根据时间算出`fraction`，然后`PropertyValuesHolder`根据`fraction`算出动画值，并通过`AnimatorUpdateListener.onAnimationUpdate()`通知外部。
 
-# 总结
+## 总结
 ![ValueAnimator2](../../assets/img/ValueAnimator2.png)
 
 
