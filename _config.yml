@@ -30,7 +30,7 @@ exclude:
 # Optimize Jekyl SEO Tag
 logo: logo.png
 social:
-  name: Songzi Vong
+  name: Bernie-sw-jiang
   links:
     - https://github.com/Bernie-sw-jiang
 lang: en
@@ -49,5 +49,5 @@ sass:
 
 # Specify the author for blog posts
 author:
-  name:
+  name: BernieJiang
   url: https://github.com/Bernie-sw-jiang
