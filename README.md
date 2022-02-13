@@ -14,7 +14,6 @@
 
 See Not Pure Poole in action with [the demo site](https://vszhub.github.io/not-pure-poole/).
 
-![Screenshot](screenshot.png)
 
 ## Table of Contents <!-- omit in toc -->
 

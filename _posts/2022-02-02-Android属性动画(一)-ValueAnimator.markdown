@@ -5,7 +5,7 @@ date:   2022-02-02
 toc:  true
 tags: [Android动画]
 ---
-源码角度分析ValueAnimator内部实现原理   
+源码角度分析ValueAnimator内部实现原理。
 
 ## 介绍
 
@@ -596,7 +596,7 @@ public void setCurrentFraction(float fraction) {
 ![ValueAnimator2](../assets/img/ValueAnimator2.png)
 
 
-本文详细介绍了`ValueAnimator`的具体实现原理，让大家对Android的动画系统有了初步的了解，[下一章](../2022-02-12-Android属性动画(二)-Choreographer.markdown)我们将继续深入底层，介绍`Choreographer`。
+本文详细介绍了`ValueAnimator`的具体实现原理，让大家对Android的动画系统有了初步的了解，[下一章](../2022-02-12-Android属性动画(二)-Choreographer)我们将继续深入底层，介绍`Choreographer`。
 
 参考
 
