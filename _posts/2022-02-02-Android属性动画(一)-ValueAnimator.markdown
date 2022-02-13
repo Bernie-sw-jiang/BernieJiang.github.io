@@ -285,7 +285,7 @@ private class MyFrameCallbackProvider implements AnimationFrameCallbackProvider 
 }
 ```
 
-`getProvider()`方法会得到一个`AnimationHandler`的内部类`P`，其实就是负责与`Choreographer`交互的中间人，那么`Choreographer`是什么呢？这里先简单介绍下，`Choreographer`是android系统中所有动画和绘制的管理者，以接近恒定的16.6ms(60HZ)为通知上层做绘制操作。介于篇幅有限，这里先略过`Choreographer`实现原理，先把主流程走完，我们将在[下一章](../Android属性动画(二)-Choreographer)中详细介绍`Choreographer`。
+`getProvider()`方法会得到一个`AnimationHandler`的内部类`P`，其实就是负责与`Choreographer`交互的中间人，那么`Choreographer`是什么呢？这里先简单介绍下，`Choreographer`是android系统中所有动画和绘制的管理者，以接近恒定的16.6ms(60HZ)为通知上层做绘制操作。介于篇幅有限，这里先略过`Choreographer`实现原理，先把主流程走完，我们将在[下一章](../2022-02-12-Android属性动画(二)-Choreographer)中详细介绍`Choreographer`。
 
 ```java
 // AnimationHandler
@@ -435,7 +435,7 @@ public float getFloatValue(float fraction) {
 7. `ValueAnimator`通过`AnimatorUpdateListener.onAnimationUpdate()`通知外部
 7. 重复2
 
-![ValueAnimator1](../../assets/img/ValueAnimator1.png)
+![ValueAnimator1](../assets/img/ValueAnimator1.png)
 
 `addAnimationCallback()`方法到此结束，下面我们再看一下`ValueAnimator.start()`方法中调用的另外两个方法。
 
@@ -593,10 +593,10 @@ public void setCurrentFraction(float fraction) {
 可以看到无论是`setCurrentPlayTime()`还是`setCurrentFraction()`和之前`animateBasedOnTime()`的原理是一样的，都是先根据时间算出`fraction`，然后`PropertyValuesHolder`根据`fraction`算出动画值，并通过`AnimatorUpdateListener.onAnimationUpdate()`通知外部。
 
 ## 总结
-![ValueAnimator2](../../assets/img/ValueAnimator2.png)
+![ValueAnimator2](../assets/img/ValueAnimator2.png)
 
 
-本文详细介绍了`ValueAnimator`的具体实现原理，让大家对Android的动画系统有了初步的了解，[下一章](../Android属性动画(二)-Choreographer)我们将继续深入底层，介绍`Choreographer`。
+本文详细介绍了`ValueAnimator`的具体实现原理，让大家对Android的动画系统有了初步的了解，[下一章](../2022-02-12-Android属性动画(二)-Choreographer.markdown)我们将继续深入底层，介绍`Choreographer`。
 
 参考
 
