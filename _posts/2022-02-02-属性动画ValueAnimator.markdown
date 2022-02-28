@@ -1,11 +1,11 @@
 ---
 layout: post
-title:  "Android属性动画(一)-ValueAnimator"
+title:  "属性动画ValueAnimator"
 date:   2022-02-02
 toc:  true
-tags: [Android动画]
+tags: [Android源码解读]
 ---
-属性动画ValueAnimator内部实现原理。
+属性动画`ValueAnimator`
 
 ## 介绍
 
@@ -285,7 +285,7 @@ private class MyFrameCallbackProvider implements AnimationFrameCallbackProvider 
 }
 ```
 
-`getProvider()`方法会得到一个`AnimationHandler`的内部类`P`，其实就是负责与`Choreographer`交互的中间人，那么`Choreographer`是什么呢？这里先简单介绍下，`Choreographer`是android系统中所有动画和绘制的管理者，以接近恒定的频率(10ms通知一次)通知上层做绘制操作。介于篇幅有限，这里先略过`Choreographer`实现原理，先把主流程走完，我们将在[下一章](../2022-02-12-Android属性动画(二)-Choreographer)中详细介绍`Choreographer`。
+`getProvider()`方法会得到一个`AnimationHandler`的内部类`P`，其实就是负责与`Choreographer`交互的中间人，那么`Choreographer`是什么呢？这里先简单介绍下，`Choreographer`是android系统中所有动画和绘制的管理者，以接近恒定的频率(10ms通知一次)通知上层做绘制操作。介于篇幅有限，这里先略过`Choreographer`实现原理，先把主流程走完，我们将在[Choreographer](../2022-02-12-Choreographer)中详细介绍。
 
 ```java
 // AnimationHandler
@@ -598,7 +598,7 @@ public void setCurrentFraction(float fraction) {
 ![ValueAnimator2](../assets/img/ValueAnimator2.png)
 
 
-本文详细介绍了`ValueAnimator`的具体实现原理，让大家对Android的动画系统有了初步的了解，[下一章](../2022-02-12-Android属性动画(二)-Choreographer)我们将继续深入底层，介绍`Choreographer`。
+本文介绍了`ValueAnimator`的具体实现原理，让大家对Android的动画系统有了初步的了解，[下一章](../2022-02-12-Choreographer)我们将继续深入底层，介绍`Choreographer`。
 
 参考
 
