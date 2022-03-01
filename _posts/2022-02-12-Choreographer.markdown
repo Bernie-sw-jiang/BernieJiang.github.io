@@ -173,7 +173,7 @@ static jlong nativeInit(JNIEnv* env, jclass clazz, jobject receiverWeak, jobject
 }
 ```
 
-后续链路很长，我们不再继续跟下去。简单来说，在`DisplayEventReceiver`初始化过程中，建立了一条通过`BitTube`(本质是一个socket pair)来传递和请求Vsync事件的链路。当`SurfaceFlinger`收到Vsync事件之后，通过`appEventThread`将这个事件通过`BitTube`传给`DisplayEventDispatcher`，并调用`DisplayEventReceiver.dispatchVsync`方法。感兴趣的同学可以看一下[袁大佬的文章](http://gityuan.com/2017/02/11/surface_flinger/)。
+后续链路很长，我们不再继续跟下去。简单来说，在`DisplayEventReceiver`初始化过程中，建立了一条通过`BitTube`(本质是一个socket pair)来传递和请求Vsync事件的链路。VSync是Vertical Synchronization(垂直同步)的缩写，是一种在PC上很早就广泛使用的技术，可以简单的把它认为是一种定时中断，`Android`系统每隔一个帧间时长(16.6ms)会发出VSYNC信号。当`SurfaceFlinger`收到Vsync事件之后，通过`appEventThread`将这个事件通过`BitTube`传给`DisplayEventDispatcher`，并调用`DisplayEventReceiver.dispatchVsync`方法。感兴趣的同学可以看一下[袁大佬的文章](http://gityuan.com/2017/02/11/surface_flinger/)。
 
 ```c++
 void NativeDisplayEventReceiver::dispatchVsync(nsecs_t timestamp, int32_t id, uint32_t count) {
