@@ -98,7 +98,7 @@ private static final class CallbackRecord {
 }
 
 public interface FrameCallback {
-	public void doFrame(long frameTimeNanos);
+  public void doFrame(long frameTimeNanos);
 }
 ```
 
@@ -115,7 +115,7 @@ private static final int CALLBACK_LAST = CALLBACK_COMMIT;
 
 private Choreographer(Looper looper, int vsyncSource) {  
   ...
-	mCallbackQueues = new CallbackQueue[CALLBACK_LAST + 1];
+  mCallbackQueues = new CallbackQueue[CALLBACK_LAST + 1];
   for (int i = 0; i <= CALLBACK_LAST; i++) {
     mCallbackQueues[i] = new CallbackQueue();
   }
@@ -548,4 +548,4 @@ private class MyFrameCallbackProvider implements AnimationFrameCallbackProvider 
 注
 
 1. 以上代码均基于API 30
-2. 本文运用了大量`Handler`相关知识，对此不熟悉的同学可以阅读[Handler](../2022-02-27-Handler)
+2. 本文运用了大量`Handler`相关知识，对此不熟悉的同学可以阅读[消息机制](../2022-02-27-消息机制)
