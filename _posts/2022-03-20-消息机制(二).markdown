@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "消息机制（一）"
+title:  "消息机制(二)"
 date:   2022-02-27
 toc:  true
 tags: [Android源码解读]
@@ -352,4 +352,4 @@ void Looper::wake() {
 注
 
 1. 以上代码均基于API 30
-1. Epoll
+1. Epoll https://www.jianshu.com/p/cb15e7d41f5b

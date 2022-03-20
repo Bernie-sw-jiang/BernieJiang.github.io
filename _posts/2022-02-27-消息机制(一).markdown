@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "消息机制（一）"
+title:  "消息机制(一)"
 date:   2022-02-27
 toc:  true
 tags: [Android源码解读]
@@ -761,7 +761,7 @@ private boolean enqueueMessage(@NonNull MessageQueue queue, @NonNull Message msg
 
 ![MessageQueue.next](../assets/img/消息机制3.png)
 
-消息机制在Java层的相关流程我们已经介绍完了，但是还有部分`MessageQueue`的native方法没有介绍，这些方法涉及队列的阻塞和唤醒，另外其实native层也有自己一套完整的消息机制，我们会在[消息机制（二）](../2022-03-20-消息机制（二）)中详细介绍
+消息机制在Java层的相关流程我们已经介绍完了，但是还有部分`MessageQueue`的native方法没有介绍，这些方法涉及队列的阻塞和唤醒，另外其实native层也有自己一套完整的消息机制，我们会在[消息机制(二)](../2022-03-20-消息机制(二))中详细介绍
 
 参考
 
