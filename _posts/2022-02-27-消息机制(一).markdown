@@ -233,13 +233,13 @@ public static void loop() {
   // 确保在权限检查时基于本地进程，而不是调用进程
   Binder.clearCallingIdentity();
   final long ident = Binder.clearCallingIdentity();
-	...
+  ...
   for (;;) {
     Message msg = queue.next();  // 该方法可能会阻塞
     if (msg == null) {
       return;
     }
-		...
+    ...
     final Observer observer = sObserver;
     Object token = null;
     if (observer != null) {
@@ -247,7 +247,7 @@ public static void loop() {
     }
     try {
       ...
-			// 分发消息
+      // 分发消息
       msg.target.dispatchMessage(msg);
       if (observer != null) {
         observer.messageDispatched(token, msg);
@@ -260,7 +260,7 @@ public static void loop() {
     } finally {
       ...
     }
-		... 
+    ... 
     // 恢复调用进程信息
     final long newIdent = Binder.clearCallingIdentity();
     msg.recycleUnchecked();
@@ -467,7 +467,7 @@ boolean enqueueMessage(Message msg, long when) {
     if (mQuitting) {
       // 正在退出时无法添加Message
       ...
-			msg.recycle();
+      msg.recycle();
       return false;
     }
 
@@ -559,10 +559,10 @@ private int postSyncBarrier(long when) {
 ```java
 // MessageQueue
 void quit(boolean safe) {
-	if (!mQuitAllowed) {
-		// 不允许退出时调用MeaageQueue.quit会直接报错
-		throw new IllegalStateException("Main thread not allowed to quit.");
-	}
+  if (!mQuitAllowed) {
+    // 不允许退出时调用MeaageQueue.quit会直接报错
+    throw new IllegalStateException("Main thread not allowed to quit.");
+  }
   
   synchronized (this) {
     if (mQuitting) {
@@ -647,8 +647,8 @@ public Handler(@Nullable Callback callback) {
 }
 
 public Handler(@Nullable Callback callback, boolean async) {
-	...    
-	// 默认绑定调度线程的Looper
+  ...    
+  // 默认绑定调度线程的Looper
   mLooper = Looper.myLooper();
   if (mLooper == null) {
     // 如果当前线程Looper没有调用过Looper.prepare则会报错
