@@ -560,7 +560,7 @@ private int postSyncBarrier(long when) {
 // MessageQueue
 void quit(boolean safe) {
 	if (!mQuitAllowed) {
-      // 不允许退出时调用MeaageQueue.quit会直接报错
+		// 不允许退出时调用MeaageQueue.quit会直接报错
 		throw new IllegalStateException("Main thread not allowed to quit.");
 	}
   
@@ -628,7 +628,7 @@ private void removeAllMessagesLocked() {
 2. `nativePollOnce` （阻塞等待）
 3. `nativeWake`（强制唤醒）
 
-以及Native层的消息队列`NativeMessageQueue`，介于`MessaegQueue`的native层内容较多，我们会在[消息机制（二）](../2022-03-20-消息机制（二）)中详细介绍
+以及Native层的消息队列`NativeMessageQueue`，介于`MessaegQueue`的native层内容较多，我们会在[消息机制(二)](../2022-03-20-消息机制(二))中详细介绍
 
 ### `Handler`
 
