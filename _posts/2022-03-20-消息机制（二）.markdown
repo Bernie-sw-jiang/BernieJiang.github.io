@@ -1,0 +1,355 @@
+---
+layout: post
+title:  "消息机制（一）"
+date:   2022-02-27
+toc:  true
+tags: [Android源码解读]
+---
+消息机制是`Android`系统实现线程间通信的重要手段
+
+
+
+### `NativeMessageQueue`
+
+#### `MessageQueue.nativeInit`
+
+`MessageQueue`在创建时，调用了native方法`nativeInit`。
+
+```c++
+// MessageQueue
+MessageQueue(boolean quitAllowed) {
+  mQuitAllowed = quitAllowed;
+  mPtr = nativeInit();
+}
+
+// android_os_MessageQueue
+static jlong android_os_MessageQueue_nativeInit(JNIEnv* env, jclass clazz) {
+  NativeMessageQueue* nativeMessageQueue = new NativeMessageQueue();
+  if (!nativeMessageQueue) {
+    jniThrowRuntimeException(env, "Unable to allocate native queue");
+    return 0;
+  }
+
+  nativeMessageQueue->incStrong(env);
+  // 强制类型转换，将NativeMessageQueue对象返回给Java层
+  return reinterpret_cast<jlong>(nativeMessageQueue);
+}
+
+NativeMessageQueue::NativeMessageQueue() :
+        mPollEnv(NULL), mPollObj(NULL), mExceptionObj(NULL) {
+	mLooper = Looper::getForThread();
+	if (mLooper == NULL) {
+		mLooper = new Looper(false);
+		Looper::setForThread(mLooper);
+	}
+}
+
+// Looper
+sp<Looper> Looper::getForThread() {
+  int result = pthread_once(& gTLSOnce, initTLSKey);
+  ...
+	return (Looper*)pthread_getspecific(gTLSKey);
+}
+```
+
+`nativeInit`方法会去创建`NativeMessageQueue`，在创建`NativeMessageQueue`时又会去创建Native层的`Looper`，Native层的`Looper`同样也是线程单例的，但是与`Java`层的`Looper`是两个东西
+
+```c++
+// Native Looper
+Looper::Looper(bool allowNonCallbacks) :
+        mAllowNonCallbacks(allowNonCallbacks), mSendingMessage(false),
+        mPolling(false), mEpollFd(-1), mEpollRebuildRequired(false),
+        mNextRequestSeq(0), mResponseIndex(0), mNextMessageUptime(LLONG_MAX) {
+	// 创建唤醒事件mWakeEventFd
+	mWakeEventFd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	LOG_ALWAYS_FATAL_IF(mWakeEventFd < 0, "Could not make wake event fd: %s", strerror(errno));
+
+	AutoMutex _l(mLock);
+	rebuildEpollLocked();
+}
+
+void Looper::rebuildEpollLocked() {
+  if (mEpollFd >= 0) {
+    close(mEpollFd);
+  }
+
+  // 创建新的epoll实例mEpollFd， EPOLL_SIZE_HINT为8
+  mEpollFd = epoll_create(EPOLL_SIZE_HINT);
+
+  struct epoll_event eventItem;
+  // 先进行置0操作
+  memset(& eventItem, 0, sizeof(epoll_event)); 
+  eventItem.events = EPOLLIN;
+  eventItem.data.fd = mWakeEventFd;
+  // 将唤醒事件mWakeEventFd注册到epoll实例mEpollFd中
+  int result = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, mWakeEventFd, & eventItem);
+
+  for (size_t i = 0; i < mRequests.size(); i++) {
+    const Request& request = mRequests.valueAt(i);
+    struct epoll_event eventItem;
+    request.initEventItem(&eventItem);
+    // 将mRequest队列也逐一注册到epoll实例mEpollFd中
+    int epollResult = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, request.fd, & eventItem);
+  }
+}
+```
+
+Native层的`Looper`在创建时会去构造一个epoll实例`mEpollFd`并将唤醒事件`mWakeEventFd`和`mRequests`队列全部加入epoll的监听中
+
+#### `MessageQueue.nativePollOnce`
+
+```c++
+// android_os_MessageQueue
+static void android_os_MessageQueue_nativePollOnce(JNIEnv* env, jobject obj,
+        jlong ptr, jint timeoutMillis) {
+  // 强制类型转换，将创建时生成并转给Java层的NativeMessageQueue引用ptr转换回NativeMessageQueue
+  NativeMessageQueue* nativeMessageQueue = reinterpret_cast<NativeMessageQueue*>(ptr);
+  nativeMessageQueue->pollOnce(env, obj, timeoutMillis);
+}
+
+void NativeMessageQueue::pollOnce(JNIEnv* env, jobject pollObj, int timeoutMillis) {
+  mPollEnv = env;
+  mPollObj = pollObj;
+  mLooper->pollOnce(timeoutMillis);
+  mPollObj = NULL;
+  mPollEnv = NULL;
+	...
+}
+
+// Native Looper
+inline int pollOnce(int timeoutMillis) {
+  return pollOnce(timeoutMillis, NULL, NULL, NULL); 
+}
+
+int Looper::pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outData) {
+  int result = 0;
+  for (;;) {
+    while (mResponseIndex < mResponses.size()) {
+      const Response& response = mResponses.itemAt(mResponseIndex++);
+      int ident = response.request.ident;
+      if (ident >= 0) {
+        int fd = response.request.fd;
+        int events = response.events;
+        void* data = response.request.data;
+        if (outFd != NULL) *outFd = fd;
+        if (outEvents != NULL) *outEvents = events;
+        if (outData != NULL) *outData = data;
+        return ident;
+      }
+    }
+    
+    if (result != 0) {
+      if (outFd != NULL) *outFd = 0;
+      if (outEvents != NULL) *outEvents = 0;
+      if (outData != NULL) *outData = NULL;
+      return result;
+    }
+    result = pollInner(timeoutMillis);
+  }
+}
+```
+
+`MessageQueue.nativePollOnce`会调用Native层`Looper::pollOnce`方法，该方法又会创建一个无限循环，如果`mResponses`数组中有`response.request.ident>=0`的`Response`事件会优先返回，那么`response.request.ident`什么情况下会>=0呢？
+
+```c++
+int Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callback, void* data) {
+  if (!callback.get()) {
+    if (! mAllowNonCallbacks) {
+      return -1;
+    }
+    // 如果没有callback，则ident必须>=0
+    if (ident < 0) {
+      return -1;
+    }
+  } else {
+		// 如果有callback, ident = POLL_CALLBACK, POLL_CALLBACK = -2,
+    ident = POLL_CALLBACK;
+  }
+
+  { 
+    AutoMutex _l(mLock);
+    Request request;
+    request.fd = fd;
+    request.ident = ident;
+    request.events = events;
+    request.seq = mNextRequestSeq++;
+    request.callback = callback;
+    request.data = data;
+    if (mNextRequestSeq == -1) mNextRequestSeq = 0; // reserve sequence number -1
+
+    struct epoll_event eventItem;
+    request.initEventItem(&eventItem);
+
+    ssize_t requestIndex = mRequests.indexOfKey(fd);
+    if (requestIndex < 0) {
+      int epollResult = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, & eventItem);
+      mRequests.add(fd, request);
+    } else {
+      int epollResult = epoll_ctl(mEpollFd, EPOLL_CTL_MOD, fd, & eventItem);
+      ...
+        mRequests.replaceValueAt(requestIndex, request);
+    }
+  }
+  return 1;
+}
+```
+
+可见，`Request`只有在没有`callback`的情况下`ident`会>0，如果有callback，则`ident = POLL_CALLBACK`即-2
+
+因此，`Looper::pollOnce`的逻辑是：如果`mResponses`数组中有`response.request.ident>=0`的事件会优先返回，因为没有`callback`,所以无须执行任何回调，直接返回Java层，否则会调用 `Looper::pollInner`方法，参数`timeoutMillis`为Java层传过来的超时时长，并将返回值`result`返回给Java层
+
+```c++
+// Native Looper
+int Looper::pollInner(int timeoutMillis) {
+	...
+  int result = POLL_WAKE;
+  // 清空mResponses数组
+  mResponses.clear();
+  mResponseIndex = 0;
+
+  struct epoll_event eventItems[EPOLL_MAX_EVENTS];
+  // 等待事件发生或超时，epoll实例mEpollFd监听的事件有：唤醒事件mWakeEventFd和mRequests队列
+  int eventCount = epoll_wait(mEpollFd, eventItems, EPOLL_MAX_EVENTS, timeoutMillis);
+  
+  ...
+  if (eventCount < 0) {
+    // 发生错误，result = POLL_ERROR，跳转Done
+    if (errno == EINTR) {
+      goto Done;
+    }
+    result = POLL_ERROR;
+    goto Done;
+  }
+
+  if (eventCount == 0) {
+    // 超时，result = POLL_TIMEOUT，跳转Done
+    result = POLL_TIMEOUT;
+    goto Done;
+  }
+
+  for (int i = 0; i < eventCount; i++) {
+    // 逐个处理收到的事件
+    int fd = eventItems[i].data.fd;
+    uint32_t epollEvents = eventItems[i].events;
+    if (fd == mWakeEventFd) {
+      if (epollEvents & EPOLLIN) {
+        // 如果收到的事件是mWakeEventFd，读取并清空管道数据
+        awoken();
+      } else {
+        ALOGW("Ignoring unexpected epoll events 0x%x on wake event fd.", epollEvents);
+      }
+    } else {
+      ssize_t requestIndex = mRequests.indexOfKey(fd);
+      if (requestIndex >= 0) {
+        int events = 0;
+        if (epollEvents & EPOLLIN) events |= EVENT_INPUT;
+        if (epollEvents & EPOLLOUT) events |= EVENT_OUTPUT;
+        if (epollEvents & EPOLLERR) events |= EVENT_ERROR;
+        if (epollEvents & EPOLLHUP) events |= EVENT_HANGUP;
+        // 如果收到的事件为mRequest队列，则将收到的Request处理转化为Response并放入mResponse数组中
+        pushResponse(events, mRequests.valueAt(requestIndex));
+      } else {
+        ALOGW("Ignoring unexpected epoll events 0x%x on fd %d that is "
+              "no longer registered.", epollEvents, fd);
+      }
+    }
+  }
+Done: ;
+
+  mNextMessageUptime = LLONG_MAX;
+  while (mMessageEnvelopes.size() != 0) {
+    nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+    const MessageEnvelope& messageEnvelope = mMessageEnvelopes.itemAt(0);
+    if (messageEnvelope.uptime <= now) {
+      { 
+        sp<MessageHandler> handler = messageEnvelope.handler;
+        Message message = messageEnvelope.message;
+        mMessageEnvelopes.removeAt(0);
+        mSendingMessage = true;
+        mLock.unlock();
+        // 优先处理native层的Message
+        handler->handleMessage(message);
+      }
+
+      mLock.lock();
+      mSendingMessage = false;
+      result = POLL_CALLBACK;
+    } else {
+      mNextMessageUptime = messageEnvelope.uptime;
+      break;
+    }
+  }
+
+  mLock.unlock();
+  for (size_t i = 0; i < mResponses.size(); i++) {
+    Response& response = mResponses.editItemAt(i);
+    // 其次处理response.request.ident == POLL_CALLBACK即有callback的Response事件，执行Reponse相应的回调方法
+    if (response.request.ident == POLL_CALLBACK) {
+      int fd = response.request.fd;
+      int events = response.events;
+      void* data = response.request.data;
+      int callbackResult = response.request.callback->handleEvent(fd, events, data);
+      if (callbackResult == 0) {
+        removeFd(fd, response.request.seq);
+      }
+      response.request.callback.clear();
+      result = POLL_CALLBACK;
+    }
+  }
+  return result;
+}
+```
+
+可见，`MessageQueue.nativePollOnce`虽然在Java层上的感知仅仅只是阻塞操作，但其中还做了很多复杂操作，远没有想象的那么简单：
+
+1. 如果`mResponses`数组中有`response.request.ident>=0`的事件会直接返回
+2. 调用`epoll_wait`，这是阻塞方法，用于等待事件发生或者超时，等待的事件有：唤醒事件`mWakeEventFd`和`mRequests`队列
+3. 对于`epoll_wait`返回，当且仅当以下3种情况：
+   - `POLL_ERROR`，发生错误，直接跳转到`Done`；
+   - `POLL_TIMEOUT`，发生超时，直接跳转到`Done`；
+   - 检测到管道有事件发生：
+     - 如果收到的事件为`mWakeEventFd`，读取并清空管道数据
+     - 如果收到的事件为`mRequest`队列，则将收到的`Request`处理转化为`Response`并放入`mResponse`数组中
+4. 进入`Done`标记位的代码段：
+   - 优先处理`mMessageEnvelopes`中的Native层`Message`，调用Native 的`Handler`来处理该`Message`;
+   - 再处理`mResponse`数组中有callback的事件，执行相应回调
+5. 返回给Java层
+
+#### `MessageQueue.nativeWake`
+
+```c++
+// android_os_MessageQueue
+static void android_os_MessageQueue_nativeWake(JNIEnv* env, jclass clazz, jlong ptr) {
+  NativeMessageQueue* nativeMessageQueue = reinterpret_cast<NativeMessageQueue*>(ptr);
+  nativeMessageQueue->wake();
+}
+
+void NativeMessageQueue::wake() {
+  mLooper->wake();
+}
+
+void Looper::wake() {
+  uint64_t inc = 1;
+  // 向管道mWakeEventFd写入字符1，TEMP_FAILURE_RETRY是一个宏定义，当执行write失败后，会不断重复执行，直到执行成功
+  ssize_t nWrite = TEMP_FAILURE_RETRY(write(mWakeEventFd, &inc, sizeof(uint64_t)));
+  if (nWrite != sizeof(uint64_t)) {
+    if (errno != EAGAIN) {
+      ALOGW("Could not write wake signal, errno=%d", errno);
+    }
+  }
+}
+```
+
+`MessageQueue.nativeWake`会向管道`mWakeEventFd`写入字符1，以此让epoll实例`mEpollFd`收到事件达到强制唤醒的目的，`mWakeEventFd`的用处也正是于此。
+
+
+
+参考
+
+1. [Android消息机制1-Handler(Java层)](http://gityuan.com/2015/12/26/handler-message-framework/)
+1. [Android消息机制2-Handler(Native层)](http://gityuan.com/2015/12/27/handler-message-native/)
+
+注
+
+1. 以上代码均基于API 30
+1. Epoll
