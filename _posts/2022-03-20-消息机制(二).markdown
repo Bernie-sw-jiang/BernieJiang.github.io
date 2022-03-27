@@ -1,5 +1,5 @@
 ---
- layout: post
+layout: post
 title:  "消息机制(二)"
 date:   2022-03-20
 toc:  true
@@ -56,9 +56,9 @@ NativeMessageQueue::NativeMessageQueue() :
         mPollEnv(NULL), mPollObj(NULL), mExceptionObj(NULL) {
   mLooper = Looper::getForThread();
   if (mLooper == NULL) {
-		mLooper = new Looper(false);
-		Looper::setForThread(mLooper);
-	}
+    mLooper = new Looper(false);
+    Looper::setForThread(mLooper);
+  }
 }
 
 // Looper
@@ -129,8 +129,8 @@ Message next() {
 
   for (;;) {
     ...
-      // 阻塞操作，当等待超过nextPollTimeoutMillis或Native层的消息队列NativeMessageQueue收到事件时会返回
-      nativePollOnce(ptr, nextPollTimeoutMillis); 
+    // 阻塞操作，当等待超过nextPollTimeoutMillis或Native层的消息队列NativeMessageQueue收到事件时会返回
+    nativePollOnce(ptr, nextPollTimeoutMillis); 
     ...
   }
 }
@@ -204,9 +204,9 @@ struct Request {
 
 class LooperCallback : public virtual RefBase {
 protected:
-	virtual ~LooperCallback() { }
+  virtual ~LooperCallback() { }
 public:
-	virtual int handleEvent(int fd, int events, void* data) = 0;
+  virtual int handleEvent(int fd, int events, void* data) = 0;
 };
 
 struct Response {
@@ -285,7 +285,7 @@ int Looper::pollInner(int timeoutMillis) {
     int messageTimeoutMillis = toMillisecondTimeoutDelay(now, mNextMessageUptime);
     // 如果messageTimeoutMillis比Java层的超时时间短，则设置超时时间为messageTimeoutMillis,超时后先处理Native消息
     if (messageTimeoutMillis >= 0
-        && (timeoutMillis < 0 || messageTimeoutMillis < timeoutMillis)) {
+      && (timeoutMillis < 0 || messageTimeoutMillis < timeoutMillis)) {
       timeoutMillis = messageTimeoutMillis;
     }
   }
