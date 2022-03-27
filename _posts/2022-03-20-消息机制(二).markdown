@@ -46,7 +46,7 @@ static jlong android_os_MessageQueue_nativeInit(JNIEnv* env, jclass clazz) {
     jniThrowRuntimeException(env, "Unable to allocate native queue");
     return 0;
   }
-	// 添加引用
+  // 添加引用
   nativeMessageQueue->incStrong(env);
   // 强制类型转换，将NativeMessageQueue对象返回给Java层
   return reinterpret_cast<jlong>(nativeMessageQueue);
@@ -54,8 +54,8 @@ static jlong android_os_MessageQueue_nativeInit(JNIEnv* env, jclass clazz) {
 
 NativeMessageQueue::NativeMessageQueue() :
         mPollEnv(NULL), mPollObj(NULL), mExceptionObj(NULL) {
-	mLooper = Looper::getForThread();
-	if (mLooper == NULL) {
+  mLooper = Looper::getForThread();
+  if (mLooper == NULL) {
 		mLooper = new Looper(false);
 		Looper::setForThread(mLooper);
 	}
@@ -65,7 +65,7 @@ NativeMessageQueue::NativeMessageQueue() :
 sp<Looper> Looper::getForThread() {
   int result = pthread_once(& gTLSOnce, initTLSKey);
   ...
-	return (Looper*)pthread_getspecific(gTLSKey);
+  return (Looper*)pthread_getspecific(gTLSKey);
 }
 ```
 
@@ -122,17 +122,18 @@ Native层的`Looper`在创建时会去构造一个epoll实例`mEpollFd`并将唤
 ```c++
 // MessageQueue
 Message next() {
-    final long ptr = mPtr;
-    if (ptr == 0) {
-        return null;
-    }
+  final long ptr = mPtr;
+  if (ptr == 0) {
+    return null;
+  }
 
-    for (;;) {
-        ...
-        // 阻塞操作，当等待超过nextPollTimeoutMillis或Native层的消息队列NativeMessageQueue收到事件时会返回
-        nativePollOnce(ptr, nextPollTimeoutMillis); 
-        ...
-    }
+  for (;;) {
+    ...
+      // 阻塞操作，当等待超过nextPollTimeoutMillis或Native层的消息队列NativeMessageQueue收到事件时会返回
+      nativePollOnce(ptr, nextPollTimeoutMillis); 
+    ...
+  }
+}
   
 // android_os_MessageQueue
 static void android_os_MessageQueue_nativePollOnce(JNIEnv* env, jobject obj,
@@ -148,7 +149,7 @@ void NativeMessageQueue::pollOnce(JNIEnv* env, jobject pollObj, int timeoutMilli
   mLooper->pollOnce(timeoutMillis);
   mPollObj = NULL;
   mPollEnv = NULL;
-	...
+  ...
 }
 
 // Native Looper
@@ -203,21 +204,21 @@ struct Request {
 
 class LooperCallback : public virtual RefBase {
 protected:
-    virtual ~LooperCallback() { }
+	virtual ~LooperCallback() { }
 public:
-    virtual int handleEvent(int fd, int events, void* data) = 0;
+	virtual int handleEvent(int fd, int events, void* data) = 0;
 };
 
 struct Response {
-    int events;
-    Request request;
+  int events;
+  Request request;
 };
 
 void Looper::pushResponse(int events, const Request& request) {
-    Response response;
-    response.events = events;
-    response.request = request;
-    mResponses.push(response);
+  Response response;
+  response.events = events;
+  response.request = request;
+  mResponses.push(response);
 }
 ```
 
@@ -236,7 +237,7 @@ int Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callb
       return -1;
     }
   } else {
-		// 如果有callback, ident = POLL_CALLBACK, POLL_CALLBACK = -2,
+    // 如果有callback, ident = POLL_CALLBACK, POLL_CALLBACK = -2,
     ident = POLL_CALLBACK;
   }
 
@@ -253,7 +254,7 @@ int Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callb
 
     struct epoll_event eventItem;
     request.initEventItem(&eventItem);
-		// 根据文件描述符从队列中查找
+    // 根据文件描述符从队列中查找
     ssize_t requestIndex = mRequests.indexOfKey(fd);
     if (requestIndex < 0) {
       int epollResult = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, & eventItem);
@@ -277,7 +278,7 @@ int Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callb
 ```c++
 // Native Looper
 int Looper::pollInner(int timeoutMillis) {
-	...
+  ...
   if (timeoutMillis != 0 && mNextMessageUptime != LLONG_MAX) {
     nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
     // Native层队首的消息需要等待的时间
@@ -286,7 +287,7 @@ int Looper::pollInner(int timeoutMillis) {
     if (messageTimeoutMillis >= 0
         && (timeoutMillis < 0 || messageTimeoutMillis < timeoutMillis)) {
       timeoutMillis = messageTimeoutMillis;
-		}
+    }
   }
   // POLL_WAKE = -1
   int result = POLL_WAKE;
@@ -414,26 +415,26 @@ Done: ;
 
 ```c++
 struct MessageEnvelope { 
-    MessageEnvelope() : uptime(0) { }
-    MessageEnvelope(nsecs_t uptime, const sp<MessageHandler> handler,
-            const Message& message) : uptime(uptime), handler(handler), message(message) {
-    }
-    nsecs_t uptime; // 执行时间
-    sp<MessageHandler> handler;
-    Message message;
+  MessageEnvelope() : uptime(0) { }
+  MessageEnvelope(nsecs_t uptime, const sp<MessageHandler> handler,
+                  const Message& message) : uptime(uptime), handler(handler), message(message) {
+  }
+  nsecs_t uptime; // 执行时间
+  sp<MessageHandler> handler;
+  Message message;
 };
 
 struct Message {
-    Message() : what(0) { }
-    Message(int what) : what(what) { }
-    int what; // 消息类型
+  Message() : what(0) { }
+  Message(int what) : what(what) { }
+  int what; // 消息类型
 };
 
 class MessageHandler : public virtual RefBase {
 protected:
-    virtual ~MessageHandler() { }
+  virtual ~MessageHandler() { }
 public:
-    virtual void handleMessage(const Message& message) = 0;
+  virtual void handleMessage(const Message& message) = 0;
 };
 ```
 
@@ -470,7 +471,7 @@ void Looper::sendMessageAtTime(nsecs_t uptime, const sp<MessageHandler>& handler
       return;
     }
   }
-	// 如果插在首位，唤醒队列
+  // 如果插在首位，唤醒队列
   if (i == 0) {
     wake();
   }
@@ -486,7 +487,7 @@ Native层发送消息同样也是根据时间顺序插在队列的对应位置�
 ```c++
 // MessageQueue
 boolean enqueueMessage(Message msg, long when) {
-	...
+  ...
   if (needWake) {
     nativeWake(mPtr);
   }
