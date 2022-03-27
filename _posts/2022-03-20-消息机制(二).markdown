@@ -1,19 +1,36 @@
 ---
-layout: post
+ layout: post
 title:  "消息机制(二)"
 date:   2022-03-20
 toc:  true
 tags: [Android源码解读]
 ---
-消息机制是`Android`系统实现线程间通信的重要手段
+在整个`Android`源码世界里，有两大利剑，其一是`Binder` IPC机制，另一个便是消息机制，两者分别实现了进程间和线程间的通讯。
 
+## 介绍
 
+[上一篇](../2022-02-27-消息机制(一))介绍了Java层的消息机制，但是这并不是消息机制的全部，仅仅停留在Java层也不足以撑起整个`Android`系统。
 
-### `NativeMessageQueue`
+Native层也有自己的一套消息机制，而`MessageQueue`的native方法正是将两者合二为一的纽带，也是我们一窥Native层消息机制的入口。
 
-#### `MessageQueue.nativeInit`
+## 结构模型
 
-`MessageQueue`在创建时，调用了native方法`nativeInit`。
+[大图](../assets/img/消息机制4.png)
+
+![消息机制结构模型](../assets/img/消息机制4.png)
+
+- `MessageEnvelope`: 消息封装类，每个`MessageEnvelope`持有`Message`和处理消息的`MessageHandler`
+- `Message`(Native): 消息
+- `MessageHandler`: 消息处理类
+- `Request`：一种以文件描述符为载体的特殊消息
+- `Looper`(Native): 循环取出`Message`和`Request`，将`Message`分发给相应`MessageHandler`，`Request`分发给相应`LooperCallback`。每个`Looper`持有一个`MessageEnvelope`队列和一个`Request`队列
+- `NativeMessageQueue`: 辅助类，充当`Looper`和`MessageQueue`的中间人。
+
+## 源码分析
+
+### `MessageQueue.nativeInit`
+
+`MessageQueue`在创建时，调用了native方法`MessageQueue.nativeInit`
 
 ```c++
 // MessageQueue
@@ -29,7 +46,7 @@ static jlong android_os_MessageQueue_nativeInit(JNIEnv* env, jclass clazz) {
     jniThrowRuntimeException(env, "Unable to allocate native queue");
     return 0;
   }
-
+	// 添加引用
   nativeMessageQueue->incStrong(env);
   // 强制类型转换，将NativeMessageQueue对象返回给Java层
   return reinterpret_cast<jlong>(nativeMessageQueue);
@@ -53,6 +70,8 @@ sp<Looper> Looper::getForThread() {
 ```
 
 `nativeInit`方法会去创建`NativeMessageQueue`，在创建`NativeMessageQueue`时又会去创建Native层的`Looper`，Native层的`Looper`同样也是线程单例的，但是与`Java`层的`Looper`是两个东西
+
+#### 创建`Looper`
 
 ```c++
 // Native Looper
@@ -94,11 +113,27 @@ void Looper::rebuildEpollLocked() {
 }
 ```
 
-Native层的`Looper`在创建时会去构造一个epoll实例`mEpollFd`并将唤醒事件`mWakeEventFd`和`mRequests`队列全部加入epoll的监听中
+Native层的`Looper`在创建时会去构造一个epoll实例`mEpollFd`并将唤醒事件`mWakeEventFd`和`mRequests`队列全部加入epoll的监听中。
 
-#### `MessageQueue.nativePollOnce`
+### `MessageQueue.nativePollOnce`
+
+调用`MessageQueue.next`方法取消息时，会调用native方法`MessageQueue.nativePollOnce`
 
 ```c++
+// MessageQueue
+Message next() {
+    final long ptr = mPtr;
+    if (ptr == 0) {
+        return null;
+    }
+
+    for (;;) {
+        ...
+        // 阻塞操作，当等待超过nextPollTimeoutMillis或Native层的消息队列NativeMessageQueue收到事件时会返回
+        nativePollOnce(ptr, nextPollTimeoutMillis); 
+        ...
+    }
+  
 // android_os_MessageQueue
 static void android_os_MessageQueue_nativePollOnce(JNIEnv* env, jobject obj,
         jlong ptr, jint timeoutMillis) {
@@ -149,7 +184,46 @@ int Looper::pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outDa
 }
 ```
 
-`MessageQueue.nativePollOnce`会调用Native层`Looper::pollOnce`方法，该方法又会创建一个无限循环，如果`mResponses`数组中有`response.request.ident>=0`的`Response`事件会优先返回，那么`response.request.ident`什么情况下会>=0呢？
+`MessageQueue.nativePollOnce`会调用Native层`Looper::pollOnce`方法，该方法会创建一个无限循环，如果`mResponses`数组中有`response.request.ident>=0`的`Response`事件会直接返回,否则会调用`Looper::pollInner`方法，当该方法返回值不为0时返回Java层。
+
+首先来看下`Request`、`Response`结构体
+
+#### `Request`、`Response`
+
+```c++
+struct Request { 
+  int fd;
+  int ident;
+  int events;
+  int seq;
+  sp<LooperCallback> callback;
+  void* data;
+  void initEventItem(struct epoll_event* eventItem) const;
+};
+
+class LooperCallback : public virtual RefBase {
+protected:
+    virtual ~LooperCallback() { }
+public:
+    virtual int handleEvent(int fd, int events, void* data) = 0;
+};
+
+struct Response {
+    int events;
+    Request request;
+};
+
+void Looper::pushResponse(int events, const Request& request) {
+    Response response;
+    response.events = events;
+    response.request = request;
+    mResponses.push(response);
+}
+```
+
+那么`response.request.ident`什么情况下会>=0呢？
+
+#### `Looper::addFd`
 
 ```c++
 int Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callback, void* data) {
@@ -179,7 +253,7 @@ int Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callb
 
     struct epoll_event eventItem;
     request.initEventItem(&eventItem);
-
+		// 根据文件描述符从队列中查找
     ssize_t requestIndex = mRequests.indexOfKey(fd);
     if (requestIndex < 0) {
       int epollResult = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, & eventItem);
@@ -187,21 +261,34 @@ int Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callb
     } else {
       int epollResult = epoll_ctl(mEpollFd, EPOLL_CTL_MOD, fd, & eventItem);
       ...
-        mRequests.replaceValueAt(requestIndex, request);
+      mRequests.replaceValueAt(requestIndex, request);
     }
   }
   return 1;
 }
 ```
 
-可见，`Request`只有在没有`callback`的情况下`ident`会>0，如果有callback，则`ident = POLL_CALLBACK`即-2
+`Request`只有在没有`callback`的情况下`ident`会>0，如果有`callback`，则`ident = POLL_CALLBACK`即-2
 
-因此，`Looper::pollOnce`的逻辑是：如果`mResponses`数组中有`response.request.ident>=0`的事件会优先返回，因为没有`callback`,所以无须执行任何回调，直接返回Java层，否则会调用 `Looper::pollInner`方法，参数`timeoutMillis`为Java层传过来的超时时长，并将返回值`result`返回给Java层
+因此，`Looper::pollOnce`的逻辑是：如果`mResponses`数组中有`response.request.ident>=0`的事件会优先返回，因为没有`callback`,所以无须执行任何回调，直接返回Java层，否则会调用 `Looper::pollInner`方法，参数`timeoutMillis`为Java层传过来的超时时长，当返回值不为0时返回Java层
+
+#### `Looper::pollInner`
 
 ```c++
 // Native Looper
 int Looper::pollInner(int timeoutMillis) {
 	...
+  if (timeoutMillis != 0 && mNextMessageUptime != LLONG_MAX) {
+    nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+    // Native层队首的消息需要等待的时间
+    int messageTimeoutMillis = toMillisecondTimeoutDelay(now, mNextMessageUptime);
+    // 如果messageTimeoutMillis比Java层的超时时间短，则设置超时时间为messageTimeoutMillis,超时后先处理Native消息
+    if (messageTimeoutMillis >= 0
+        && (timeoutMillis < 0 || messageTimeoutMillis < timeoutMillis)) {
+      timeoutMillis = messageTimeoutMillis;
+		}
+  }
+  // POLL_WAKE = -1
   int result = POLL_WAKE;
   // 清空mResponses数组
   mResponses.clear();
@@ -213,7 +300,7 @@ int Looper::pollInner(int timeoutMillis) {
   
   ...
   if (eventCount < 0) {
-    // 发生错误，result = POLL_ERROR，跳转Done
+    // 发生错误，result = POLL_ERROR（-4），跳转Done
     if (errno == EINTR) {
       goto Done;
     }
@@ -222,7 +309,7 @@ int Looper::pollInner(int timeoutMillis) {
   }
 
   if (eventCount == 0) {
-    // 超时，result = POLL_TIMEOUT，跳转Done
+    // 超时，result = POLL_TIMEOUT（-3），跳转Done
     result = POLL_TIMEOUT;
     goto Done;
   }
@@ -246,7 +333,7 @@ int Looper::pollInner(int timeoutMillis) {
         if (epollEvents & EPOLLOUT) events |= EVENT_OUTPUT;
         if (epollEvents & EPOLLERR) events |= EVENT_ERROR;
         if (epollEvents & EPOLLHUP) events |= EVENT_HANGUP;
-        // 如果收到的事件为mRequest队列，则将收到的Request处理转化为Response并放入mResponse数组中
+        // 如果收到的事件为mRequest队列，则将收到的Request处理转化为Response并放入mResponse队列中
         pushResponse(events, mRequests.valueAt(requestIndex));
       } else {
         ALOGW("Ignoring unexpected epoll events 0x%x on fd %d that is "
@@ -273,8 +360,10 @@ Done: ;
 
       mLock.lock();
       mSendingMessage = false;
+      // POLL_CALLBACK = -2
       result = POLL_CALLBACK;
     } else {
+      // 记录下个Native消息处理时间
       mNextMessageUptime = messageEnvelope.uptime;
       break;
     }
@@ -290,6 +379,7 @@ Done: ;
       void* data = response.request.data;
       int callbackResult = response.request.callback->handleEvent(fd, events, data);
       if (callbackResult == 0) {
+        // 如果回调返回结果为0，则从mRequests队列中移除
         removeFd(fd, response.request.seq);
       }
       response.request.callback.clear();
@@ -303,7 +393,7 @@ Done: ;
 可见，`MessageQueue.nativePollOnce`虽然在Java层上的感知仅仅只是阻塞操作，但其中还做了很多复杂操作，远没有想象的那么简单：
 
 1. 如果`mResponses`数组中有`response.request.ident>=0`的事件会直接返回
-2. 调用`epoll_wait`，这是阻塞方法，用于等待事件发生或者超时，等待的事件有：唤醒事件`mWakeEventFd`和`mRequests`队列
+2. 调用`epoll_wait`，阻塞等待事件发生或者超时，超时时间为Java层队首消息和Native层队首消息等待时间的小者，等待的事件有：唤醒事件`mWakeEventFd`和`mRequests`队列
 3. 对于`epoll_wait`返回，当且仅当以下3种情况：
    - `POLL_ERROR`，发生错误，直接跳转到`Done`；
    - `POLL_TIMEOUT`，发生超时，直接跳转到`Done`；
@@ -311,13 +401,97 @@ Done: ;
      - 如果收到的事件为`mWakeEventFd`，读取并清空管道数据
      - 如果收到的事件为`mRequest`队列，则将收到的`Request`处理转化为`Response`并放入`mResponse`数组中
 4. 进入`Done`标记位的代码段：
-   - 优先处理`mMessageEnvelopes`中的Native层`Message`，调用Native 的`Handler`来处理该`Message`;
-   - 再处理`mResponse`数组中有callback的事件，执行相应回调
+   - 优先处理`mMessageEnvelopes`中的全部Native层`Message`，调用Native 的`Handler`来处理该`Message`;
+   - 再处理`mResponse`数组中有`callback`的全部事件，执行`LooperCallback`回调
 5. 返回给Java层
 
-#### `MessageQueue.nativeWake`
+到此我们可以知道消息机制中处理消息的顺序为：
+
+- 如果`mResponses`数组中存在`response.request.ident>=0`，则直接处理 `Java Message`
+- 否则，全部`Native Message` >全部 `Native Request` > `Java Message`
+
+#### `MessageEnvelope`、`Message`、`MessageHandler`
 
 ```c++
+struct MessageEnvelope { 
+    MessageEnvelope() : uptime(0) { }
+    MessageEnvelope(nsecs_t uptime, const sp<MessageHandler> handler,
+            const Message& message) : uptime(uptime), handler(handler), message(message) {
+    }
+    nsecs_t uptime; // 执行时间
+    sp<MessageHandler> handler;
+    Message message;
+};
+
+struct Message {
+    Message() : what(0) { }
+    Message(int what) : what(what) { }
+    int what; // 消息类型
+};
+
+class MessageHandler : public virtual RefBase {
+protected:
+    virtual ~MessageHandler() { }
+public:
+    virtual void handleMessage(const Message& message) = 0;
+};
+```
+
+`MessageHandler::handleMessage`为虚方法，处理消息的逻辑全部交由业务方自己实现
+
+#### `Looper::sendMessage`
+
+```c++
+// Looper
+void Looper::sendMessage(const sp<MessageHandler>& handler, const Message& message) {
+  nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+  sendMessageAtTime(now, handler, message);
+}
+
+void Looper::sendMessageDelayed(nsecs_t uptimeDelay, const sp<MessageHandler>& handler,
+        const Message& message) {
+  nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+  sendMessageAtTime(now + uptimeDelay, handler, message);
+}
+
+void Looper::sendMessageAtTime(nsecs_t uptime, const sp<MessageHandler>& handler,
+        const Message& message) {
+  size_t i = 0;
+  { 
+    AutoMutex _l(mLock);
+    size_t messageCount = mMessageEnvelopes.size();
+    // 按时间顺序添加进队列
+    while (i < messageCount && uptime >= mMessageEnvelopes.itemAt(i).uptime) {
+      i += 1;
+    }
+    MessageEnvelope messageEnvelope(uptime, handler, message);
+    mMessageEnvelopes.insertAt(messageEnvelope, i, 1);
+    if (mSendingMessage) {
+      return;
+    }
+  }
+	// 如果插在首位，唤醒队列
+  if (i == 0) {
+    wake();
+  }
+}
+```
+
+Native层发送消息同样也是根据时间顺序插在队列的对应位置，如果插在队首，则唤醒epoll实例
+
+### `MessageQueue.nativeWake`
+
+调用`MessageQueue.enqueueMessage`方法添加消息时，如果`MessageQueue`队列处于阻塞，且当前插入的消息为首个需要处理的消息，会调用native方法`nativeWake`强制唤醒epoll实例
+
+```c++
+// MessageQueue
+boolean enqueueMessage(Message msg, long when) {
+	...
+  if (needWake) {
+    nativeWake(mPtr);
+  }
+}
+
 // android_os_MessageQueue
 static void android_os_MessageQueue_nativeWake(JNIEnv* env, jclass clazz, jlong ptr) {
   NativeMessageQueue* nativeMessageQueue = reinterpret_cast<NativeMessageQueue*>(ptr);
@@ -342,14 +516,17 @@ void Looper::wake() {
 
 `MessageQueue.nativeWake`会向管道`mWakeEventFd`写入字符1，以此让epoll实例`mEpollFd`收到事件达到强制唤醒的目的，`mWakeEventFd`的用处也正是于此。
 
+## 总结
+
+到此，我们了解了`Android`消息机制的全貌，Native消息机制和Java消息机制有很多相似，也有很多不同，还望大家仔细体会。
+
 
 
 参考
 
-1. [Android消息机制1-Handler(Java层)](http://gityuan.com/2015/12/26/handler-message-framework/)
 1. [Android消息机制2-Handler(Native层)](http://gityuan.com/2015/12/27/handler-message-native/)
 
 注
 
-1. 以上代码均基于API 30
-1. Epoll https://www.jianshu.com/p/cb15e7d41f5b
+1. 以上代码基于Android 8
+1. 本文涉及Epoll相关知识，对此不熟悉的同学可以阅读[Epoll的本质]( https://www.jianshu.com/p/cb15e7d41f5b)
