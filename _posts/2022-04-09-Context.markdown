@@ -1,0 +1,572 @@
+---
+layout: post
+title:  "Context"
+date:   2022-04-09
+toc:  true
+tags: [Android源码解读]
+---
+
+相信`Context`对于所有`Android`开发者都不陌生，从《第三行代码》第一章：`Toast.makeText(this, "我是toast", Toast.LENGTH_SHORT).show()`开始，`Context`就几乎贯穿了我们整个开发生涯。
+
+## 介绍
+
+`Context`是关于app全局信息的抽象类，它的实现由`Android`系统提供。`Context`能够访问app级的资源和类，以及向上调用app级的操作，如: 启动新`Activity`、发广播和接收`Intent`等等。
+
+## 类图
+
+![Context类图](../assets/img/Context1.png)
+
+- `ContextImpl`： `Context`的真正实现类
+- `ContextWrapper`： `Context`包装类，持有一个`Context`的引用`mBase`，所有`Context`的方法都委托给`mBase`实现。可以通过`attachBaseContext`方法给`mBase`赋值
+- `ContextThemeWrapper`：比起`ContextWrapper`新增了`Resources.Theme`主题相关的接口。只有`Activity`才需要主题，因此`Activity`继承自`ContextThemeWrapper`。
+- `Application `： `Application`是全局`Context`，整个应用程序只有一个，他可以访问到应用程序的包信息等资源信息。`Application`类的`Context`的特点是生命周期长，在整个应用程序运行的期间他都会存在。
+- `Activity`：`Activity`继承自`ContextThemeWrapper`，是拥有主题的`Context`对象。`Activity`类的`Context`常用于与UI有关的操作，如果使用`Application`类的`Context`来操作UI，那么会丢失自定义的主题，采用系统默认的主题。这也是官方对于`Context`不同权限的设计，没有界面的`Context`，就不应该有操作界面的权利。
+- `Service`：`Service`继承自`ContextWrapper`，和`Activity`不同的是`Service`没有界面，所以也不需要主题。
+
+`Application`、四大组件中的`Activity`、`Service`都是直接继承自`Context`（`BroadcastReceiver`、`ContentProvider`也会间接持有`Context`），由此可以看出`Context`在`Android`系统中占领着多么重要的地位。
+
+## `Context`创建
+
+要想理解`Context`，我们需要理解各个`ContextWrapper`实现类的创建、`ContextImpl`的创建以及将`ContextImpl` attach进`ContextWrapper`的过程。
+
+### `Application`
+
+`Application`的创建如[下图](../assets/img/Context2.jpg)所示
+
+![Application创建](../assets/img/Context2.jpg)
+
+`Application`会在应用app启动（执行`ActivityThread.main`方法）时，通过`Binder`向`AMS`拿到用于创建`Application`的信息`AppBindData`，然后在`ActivityThread.handleBindApplication`方法中创建
+
+```java
+// ActivityThread
+private void handleBindApplication(AppBindData data) {
+  ...
+  // 创建LoadedApk对象
+  data.info = getPackageInfoNoCheck(data.appInfo, data.compatInfo);
+	...
+  // 创建Instrumentation
+  mInstrumentation = new Instrumentation();
+	...
+  // 创建Application对象
+  app = data.info.makeApplication(data.restrictedBackupMode, null);
+  ...
+  // 回调Application.onCreate方法
+  mInstrumentation.callApplicationOnCreate(app);
+}
+```
+
+`ActivityThread.handleBindApplication`方法做了如下几步操作：
+
+1. 创建`LoadedApk`对象
+
+   ```java
+   // ActivityThread
+   @Override
+   public final LoadedApk getPackageInfoNoCheck(ApplicationInfo ai,
+                                                CompatibilityInfo compatInfo) {
+     return getPackageInfo(ai, compatInfo, null, false, true, false);
+   }
+   
+   private LoadedApk getPackageInfo(ApplicationInfo aInfo, CompatibilityInfo compatInfo,
+                                    ClassLoader baseLoader, boolean securityViolation, boolean includeCode,
+                                    boolean registerPackage) {
+     final boolean differentUser = (UserHandle.myUserId() != UserHandle.getUserId(aInfo.uid));
+     synchronized (mResourcesManager) {
+       WeakReference<LoadedApk> ref;
+       if (differentUser) {
+   			...
+       } else if (includeCode) {
+         //从mPackages查询，如果存在就直接返回
+         ref = mPackages.get(aInfo.packageName);
+       } else {
+   			...
+       }
+   
+       LoadedApk packageInfo = ref != null ? ref.get() : null;
+       if (packageInfo != null) {
+         ...
+         return packageInfo;
+       }
+       ...
+       packageInfo = new LoadedApk(this, aInfo, compatInfo, baseLoader,
+                                   securityViolation, includeCode
+                                   && (aInfo.flags & ApplicationInfo.FLAG_HAS_CODE) != 0, registerPackage);
+       if (differentUser) {
+   			...
+       } else if (includeCode) {
+         //将新创建的LoadedApk加入到mPackages
+         mPackages.put(aInfo.packageName,
+                       new WeakReference<LoadedApk>(packageInfo));
+       } else {
+         ...
+       }
+       return packageInfo;
+   }
+   ```
+
+   `LoadedApk`对象是APK文件在内存中的表示，与`Application`是一一对应的。 Apk文件的相关信息，诸如Apk文件的代码和资源，甚至代码里面的`Activity`，`Service`等四大组件的信息我们都可以通过此对象获取。
+
+2. 创建`Instrumentation`对象
+
+   `Instrumentation`是`Android`系统里面的一套控制方法或者hook方法。这些hook方法可以在正常的生命周期（正常是由操作系统控制的)之外控制`Android`控件的运行。`Instrumentation`同时可以控制`Android`如何加载应用程序。
+
+3. 创建`Application`对象
+
+   ```java
+   // LoadedApk
+   public Application makeApplication(boolean forceDefaultAppClass,
+                                      Instrumentation instrumentation) {
+     if (mApplication != null) {
+       return mApplication;
+     }
+     // 获取类加载器
+     final java.lang.ClassLoader cl = getClassLoader();
+   	...
+     // 创建ContextImpl对象
+     ContextImpl appContext = ContextImpl.createAppContext(mActivityThread, this);
+     // 创建Application对象
+     Application app = mActivityThread.mInstrumentation.newApplication(cl, appClass, appContext);
+     appContext.setOuterContext(app);
+     ...
+     // 将新创建的app添加进ActivityThread
+   	mActivityThread.mAllApplications.add(app); 
+     mApplication = app; 
+     ...
+   	return app;
+   }
+   ```
+
+   ```java
+   // ContextImpl
+   static ContextImpl createAppContext(ActivityThread mainThread, LoadedApk packageInfo) {
+     return createAppContext(mainThread, packageInfo, null);
+   }
+   
+   static ContextImpl createAppContext(ActivityThread mainThread, LoadedApk packageInfo,
+                                       String opPackageName) {
+     if (packageInfo == null) throw new IllegalArgumentException("packageInfo");
+     ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null, null, null, null,
+                                           0, null, opPackageName);
+   	...
+     return context;
+   }
+   ```
+
+   `LoadedApk.makeApplication`首先`new`了一个`ContextImpl`对象，并将`ActivityThread`、`LoadedApk`对象传了进去
+
+   ```java
+   // Instrumentation
+   public Application newApplication(ClassLoader cl, String className, Context context)
+     throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+     // 创建Application
+     Application app = getFactory(context.getPackageName())
+       .instantiateApplication(cl, className);
+     // 将ContextImpl对象 attach到新创建的Application
+     app.attach(context);
+     return app;
+   }
+   
+   private AppComponentFactory getFactory(String pkg) {
+     ...
+     LoadedApk apk = mThread.peekPackageInfo(pkg, true);
+     return apk.getAppFactory();
+   }
+   
+   // AppComponentFactory
+   public @NonNull Application instantiateApplication(@NonNull ClassLoader cl,
+                                                      @NonNull String className)
+     throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+     return (Application) cl.loadClass(className).newInstance();
+   }
+   
+   // Application
+   final void attach(Context context) {
+     attachBaseContext(context);
+     mLoadedApk = ContextImpl.getImpl(context).mPackageInfo;
+   }
+   ```
+
+   然后，通过类加载器创建出新`Application`对象，并将`ContextImpl`attach到新创建的`Application`中
+
+4. 回调`Application.onCreate`方法
+
+```java
+// Instrumentation
+public void callApplicationOnCreate(Application app) {
+	app.onCreate();	
+}
+```
+
+### `Activity`
+
+`Activity`启动流程如[下图](../assets/img/Context3.png)所示，由于其流程较为复杂，因此会单独在另一篇文章[Activity启动流程](../2022-05-08-Activity启动流程)中介绍，这里只需知道在经过一系列调用后，最终会走到`ActivityThread.handleLaunchActivity`中
+
+![Activity创建](../assets/img/Context3.png)
+
+```java
+// ActivityThread
+public Activity handleLaunchActivity(ActivityClientRecord r,
+                                     PendingTransactionActions pendingActions, Intent customIntent) {
+  ...
+  final Activity a = performLaunchActivity(r, customIntent);
+  ...
+  return a;
+}
+
+private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
+	ActivityInfo aInfo = r.activityInfo;
+  if (r.packageInfo == null) {
+    // 获取LoadedApk对象，在创建Application时已创建，无须再次创建
+    r.packageInfo = getPackageInfo(aInfo.applicationInfo, r.compatInfo,
+                                   Context.CONTEXT_INCLUDE_CODE);
+  }
+  ...
+  // 创建ContextImpl对象
+  ContextImpl appContext = createBaseContextForActivity(r);
+  Activity activity = null;
+  // 获取类加载器
+	java.lang.ClassLoader cl = appContext.getClassLoader();
+  // 获取Instrumentation并创建Activity对象
+  activity = mInstrumentation.newActivity(cl, component.getClassName(), r.intent);
+  ...
+  // 获取Application对象，之前已创建，无须再次创建
+  Application app = r.packageInfo.makeApplication(false, mInstrumentation);
+  if (activity != null) {
+  	appContext.setOuterContext(activity);
+    // 将ContextImpl、Application等对象attach到新创建的Activity中
+    activity.attach(appContext, this, getInstrumentation(), r.token,
+                    r.ident, app, r.intent, r.activityInfo, title, r.parent,
+                    r.embeddedID, r.lastNonConfigurationInstances, config,
+                    r.referrer, r.voiceInteractor, window, r.configCallback,
+                    r.assistToken);
+    ...
+    // 设置主题
+    int theme = r.activityInfo.getThemeResource();
+    if (theme != 0) {
+      activity.setTheme(theme);
+    }
+    if (r.isPersistable()) {
+      // 回调Activity.onCreate方法
+      mInstrumentation.callActivityOnCreate(activity, r.state, r.persistentState);
+    } else {
+      mInstrumentation.callActivityOnCreate(activity, r.state);
+    }
+    mActivities.put(r.token, r);
+    ...
+    return activity;
+  }
+}
+```
+
+`ActivityThread.performLaunchActivity`方法做了如下几步操作：
+
+1. 获取`LoadedApk`对象，在创建`Application`时已经创建，无须再次创建
+
+2. 创建`ContextImpl`对象
+
+   ```java
+   // ActivityThread
+   private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {
+     ...
+     ContextImpl appContext = ContextImpl.createActivityContext(
+       this, r.packageInfo, r.activityInfo, r.token, displayId, r.overrideConfig);
+     ...
+     return appContext;
+   }
+   
+   // ContextImpl
+   static ContextImpl createActivityContext(ActivityThread mainThread,
+                                            LoadedApk packageInfo, ActivityInfo activityInfo, 
+                                            IBinder activityToken, int displayId,
+                                            Configuration overrideConfiguration) {
+     ...
+     ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null,
+                                           activityInfo.splitName, activityToken, null, 0, 
+                                           classLoader, null);
+   	...
+     return context;
+   }
+   ```
+
+3. 创建`Activity`对象
+
+   ```java
+   // Instrumentation
+   public Activity newActivity(ClassLoader cl, String className,Intent intent)
+     throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+     String pkg = intent != null && intent.getComponent() != null
+       ? intent.getComponent().getPackageName() : null;
+     return getFactory(pkg).instantiateActivity(cl, className, intent);
+   }
+   
+   private AppComponentFactory getFactory(String pkg) {
+     ...
+     LoadedApk apk = mThread.peekPackageInfo(pkg, true);
+     return apk.getAppFactory();
+   }
+   
+   // AppComponentFactory
+   public @NonNull Activity instantiateActivity(@NonNull ClassLoader cl, @NonNull String className,
+                                                @Nullable Intent intent)
+     throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+     return (Activity) cl.loadClass(className).newInstance();
+   }
+   ```
+
+4. 将`ContextImpl`、`Application`等对象attach到新创建的`Activity`中
+
+   ```java
+   // Activity
+   final void attach(Context context, ActivityThread aThread,
+                     Instrumentation instr, IBinder token, int ident,
+                     Application application, Intent intent, ActivityInfo info,
+                     CharSequence title, Activity parent, String id,
+                     NonConfigurationInstances lastNonConfigurationInstances,
+                     Configuration config, String referrer, IVoiceInteractor voiceInteractor,
+                     Window window, ActivityConfigCallback activityConfigCallback, IBinder assistToken) {
+   	attachBaseContext(context);
+     ...
+   }
+   ```
+
+5. 设置主题并回调`Activity.onCreate`方法
+
+   ```java
+   //Instrumentation
+   public void callActivityOnCreate(Activity activity, Bundle icicle,
+                                    PersistableBundle persistentState) {
+     prePerformCreate(activity);
+     activity.performCreate(icicle, persistentState);
+     postPerformCreate(activity);
+   }
+   
+   // Activity
+   final void performCreate(Bundle icicle, PersistableBundle persistentState) {
+     dispatchActivityPreCreated(icicle);
+     ...
+     if (persistentState != null) {
+       onCreate(icicle, persistentState);
+     } else {
+       onCreate(icicle);
+     }
+     dispatchActivityPostCreated(icicle);
+   }
+   
+   public void onCreate(@Nullable Bundle savedInstanceState,
+                        @Nullable PersistableBundle persistentState) {
+     onCreate(savedInstanceState);
+   }
+   
+   protected void onCreate(@Nullable Bundle savedInstanceState) {
+   	...
+   }
+   ```
+
+整体流程和创建`Application`的`ActivityThread.handleBindApplication`方法非常类似，比较大的不同是如`LoadedApk`、`Instrumentation`、`Application`等对象可以直接获取而无须再次创建。
+
+### `Service`
+
+`Service`启动流程如[下图](../assets/img/Context4.png)所示，具体流程同样也会在另一篇文章[Service启动流程](../2022-05-08-Service启动流程)中介绍，这里只需关注最终调用的`ActivityThread.handleCreateService`方法
+
+![Service创建](../assets/img/Context4.png)
+
+```java
+// ActivityThread
+private void handleCreateService(CreateServiceData data) {
+  // 获取LoadedApk对象，之前已创建过，无须再次创建
+  LoadedApk packageInfo = getPackageInfoNoCheck(data.info.applicationInfo, data.compatInfo);
+  Service service = null;
+  // 创建ContextImpl对象
+  ContextImpl context = ContextImpl.createAppContext(this, packageInfo);
+  // 获取Application对象，之前已创建过，无须再次创建
+  Application app = packageInfo.makeApplication(false, mInstrumentation);
+  // 获取类加载器
+  java.lang.ClassLoader cl = packageInfo.getClassLoader();
+  // 创建Service对象
+  service = packageInfo.getAppFactory()
+    .instantiateService(cl, data.info.name, data.intent);
+  context.setOuterContext(service);
+  // 将ContextImpl、Application等对象attach到新创建的Service中
+  service.attach(context, this, data.info.name, data.token, app,
+                 ActivityManager.getService());
+  // 回调Service.onCreate方法
+  service.onCreate();
+  mServices.put(data.token, service);
+  ...
+}
+```
+
+```java
+// AppComponentFactory
+public @NonNull Service instantiateService(@NonNull ClassLoader cl,
+                                           @NonNull String className, @Nullable Intent intent)
+  throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+  return (Service) cl.loadClass(className).newInstance();
+}
+
+// Service
+public final void attach(
+  Context context,
+  ActivityThread thread, String className, IBinder token,
+  Application application, Object activityManager) 
+{
+  attachBaseContext(context);
+  ...
+}
+```
+
+`Service`的创建流程和`Activity`、`Application`非常类似，这里就不再赘述。
+
+至此，我们了解了`ContextWrapper`实现类的创建以及将`ContextImpl` attach进去的过程，那么非`ContextWrapper`实现类是怎么持有`ContextImpl`的呢？这里以剩下的四大组件之一`BroadcastReceiver`为例作相关介绍（由于`ContentProvider`在实际开发过程中使用的较少就不介绍了）
+
+### `BroadcastReceiver`
+
+```java
+// ContextImpl
+@Override
+public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
+  return registerReceiver(receiver, filter, null, null);
+}
+
+
+@Override
+public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
+                               String broadcastPermission, Handler scheduler) {
+  // 通过getOuterContext方法获取context
+  return registerReceiverInternal(receiver, getUserId(),
+                                  filter, broadcastPermission, scheduler, getOuterContext(), 0);
+}
+
+private Intent registerReceiverInternal(BroadcastReceiver receiver, int userId,
+                                        IntentFilter filter, String broadcastPermission,
+                                        Handler scheduler, Context context, int flags) {
+  IIntentReceiver rd = null;
+  if (receiver != null) {
+    // mPackageInfo为LoadedApk对象
+    if (mPackageInfo != null && context != null) {
+      ...
+      // 将context传入ReceiverDispatcher
+      rd = mPackageInfo.getReceiverDispatcher(
+        receiver, context, scheduler,
+        mMainThread.getInstrumentation(), true);
+    }
+  }
+  ...
+  final Intent intent = ActivityManager.getService().registerReceiverWithFeature(
+    mMainThread.getApplicationThread(), mBasePackageName, getAttributionTag(), rd,
+    filter, broadcastPermission, userId, flags);
+  ...
+  return intent;
+}
+
+// LoadedApk
+public IIntentReceiver getReceiverDispatcher(BroadcastReceiver r,
+                                             Context context, Handler handler,
+                                             Instrumentation instrumentation, boolean registered) {
+	synchronized (mReceivers) {
+    LoadedApk.ReceiverDispatcher rd = null;
+    ArrayMap<BroadcastReceiver, LoadedApk.ReceiverDispatcher> map = null;
+    if (registered) {
+      map = mReceivers.get(context);
+      if (map != null) {
+        rd = map.get(r);
+      }
+    }
+    if (rd == null) {
+      rd = new ReceiverDispatcher(r, context, handler,
+                                  instrumentation, registered);
+      if (registered) {
+        if (map == null) {
+          map = new ArrayMap<BroadcastReceiver, LoadedApk.ReceiverDispatcher>();
+          // LoadedApk维护了一个Context---ArrayMap<BroadcastReceiver, ReceiverDispatcher>>的 ArrayMap
+          mReceivers.put(context, map);
+        }
+        map.put(r, rd);
+      }
+    }
+    ...
+    return rd.getIIntentReceiver();
+  }
+}
+
+// LoadedApk.ReceiverDispatcher
+ReceiverDispatcher(BroadcastReceiver receiver, Context context,
+                   Handler activityThread, Instrumentation instrumentation,
+                   boolean registered) {
+  mIIntentReceiver = new InnerReceiver(this, !registered);
+  mReceiver = receiver;
+  mContext = context;
+  ...
+}
+
+```
+
+注册广播时，会把`ContextImpl.getOuterContext`获取的`Context`传入`LoadedApk.ReceiverDispatcher`内部类中。
+
+接收广播时，最终会走到`ReceiverDispatcher.performReceive`方法中。接收广播流程详见[Broadcast广播机制](../2022-05-15-Broadcast广播机制)。
+
+```java
+// LoadedApk.ReceiverDispatcher
+public void performReceive(Intent intent, int resultCode, String data,
+                Bundle extras, boolean ordered, boolean sticky, int sendingUser) {
+   final Args args = new Args(intent, resultCode, data, extras, ordered,
+                              sticky, sendingUser);
+   ...
+   if (intent == null || !mActivityThread.post(args.getRunnable())) {
+     ...
+   }
+ }
+
+// LoadedApk.ReceiverDispatcher.Args内部类
+public final Runnable getRunnable() {
+  return () -> {
+    final BroadcastReceiver receiver = mReceiver;
+    ...
+    receiver.setPendingResult(this);
+    receiver.onReceive(mContext, intent);
+  }
+}
+```
+
+所以，`BroadcastReceiver`间接持有的`Context`为注册广播方法`ContextImpl.registerReceiver`调用方的`ContextImpl.getOuterContext`。大多数情况都是在`Activity`中注册广播，所以这个`Context`一般是`Activity`对象。
+
+## `Context`核心方法
+
+|         对象         |          方法           |     返回值      |                             备注                             |
+| :------------------: | :---------------------: | :-------------: | :----------------------------------------------------------: |
+|      `Context`       | `getApplicationContext` |    `Context`    |       本质返回的是`Application`，只不过类型是`Context`       |
+| `Activity`/`Service` |    `getApplication`     |  `Application`  |  直接返回`Application`，但该方法仅限于`Activity`/`Service`   |
+|   `ContextWrapper`   |    `getBaseContext`     |    `Context`    |                 获取`mBase`,即`ContextImpl`                  |
+|    `ContextImpl`     |    `getOuterContext`    |    `Context`    | 默认值由`ContextImpl`初始化时创建，但可以调用`setOuterContext`使其指向外部的`Context` |
+|      `Context`       |     `startActivity`     |     `Void`      | 推荐在`Activity ` 类型的`Context`中调用。非`Activity` 类型的`Context`没有任务栈，所以必须为待启动的`Activity`指定`FLAG_ACTIVITY_NEW_TASK`标记位，这样启动的时候就为它创建一个新的任务栈，而此时`Activity`是以`singleTask`模式启动的。 |
+|      `Context`       |     `startService`      | `ComponentName` |                                                              |
+|      `Context`       |      `bindService`      |    `Boolean`    |     不允许在 `BroadcastReceiver` 中调用，会直接抛出异常      |
+|      `Context`       |     `sendBroadcast`     |     `Void`      |                                                              |
+|      `Context`       |   `registerReceiver`    |     `Void`      |                                                              |
+
+## 总结
+
+`ContextWrapper`实现类的创建过程如下：
+
+1. 获取/创建`LoadedApk`
+2. 创建`ContextImpl`对象
+3. 获取/创建`Instrumentation`,并通过`Instrumentation`创建相应`ContextWrapper`实现类
+4. 将`ContextImpl`attach到`ContextWrapper`实现类
+5. 回调方法
+
+另外，虽然`Context`最终都是由`ContextImpl`实现，但是各个`Context`实现类的权限不尽相同。我们需要按照不同`Context`实现类的不同权限去调用相应方法。
+
+参考
+
+1. [Android Context](https://developer.android.com/reference/android/content/Context)
+2. [Android全面解析之Context机制](https://segmentfault.com/a/1190000038357455)
+3. [理解Android Context](http://gityuan.com/2017/04/09/android_context/)
+4. [Android插件化完美实现代码资源加载及原理讲解 附可运行demo](https://juejin.cn/post/6844903603526713357)
+5. [Instrumentation安卓官方简介](https://blog.csdn.net/zhubaitian/article/details/39578915)
+6. [startActivity启动过程分析](http://gityuan.com/2016/03/12/start-activity/)
+7. [startService启动过程分析](http://gityuan.com/2016/03/06/start-service/)
+8. [Android Broadcast广播机制分析](http://gityuan.com/2016/06/04/broadcast-receiver/)
+
+注
+
+1. 以上代码均基于API 30
