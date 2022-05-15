@@ -31,9 +31,9 @@ tags: [Android源码解读]
 
 ### `Application`
 
-`Application`的创建如[下图](../assets/img/Context2.jpg)所示
+`Application`的创建如[下图](../assets/img/Context2.png)所示
 
-![Application创建](../assets/img/Context2.jpg)
+![Application创建](../assets/img/Context2.png)
 
 `Application`会在应用app启动（执行`ActivityThread.main`方法）时，通过`Binder`向`AMS`拿到用于创建`Application`的信息`AppBindData`，然后在`ActivityThread.handleBindApplication`方法中创建
 
