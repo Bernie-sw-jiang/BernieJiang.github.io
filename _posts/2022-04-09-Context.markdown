@@ -43,10 +43,10 @@ private void handleBindApplication(AppBindData data) {
   ...
   // 创建LoadedApk对象
   data.info = getPackageInfoNoCheck(data.appInfo, data.compatInfo);
-	...
+  ...
   // 创建Instrumentation
   mInstrumentation = new Instrumentation();
-	...
+  ...
   // 创建Application对象
   app = data.info.makeApplication(data.restrictedBackupMode, null);
   ...
@@ -74,12 +74,12 @@ private void handleBindApplication(AppBindData data) {
      synchronized (mResourcesManager) {
        WeakReference<LoadedApk> ref;
        if (differentUser) {
-   			...
+         ...
        } else if (includeCode) {
          //从mPackages查询，如果存在就直接返回
          ref = mPackages.get(aInfo.packageName);
        } else {
-   			...
+         ...
        }
    
        LoadedApk packageInfo = ref != null ? ref.get() : null;
@@ -92,7 +92,7 @@ private void handleBindApplication(AppBindData data) {
                                    securityViolation, includeCode
                                    && (aInfo.flags & ApplicationInfo.FLAG_HAS_CODE) != 0, registerPackage);
        if (differentUser) {
-   			...
+         ...
        } else if (includeCode) {
          //将新创建的LoadedApk加入到mPackages
          mPackages.put(aInfo.packageName,
@@ -121,7 +121,7 @@ private void handleBindApplication(AppBindData data) {
      }
      // 获取类加载器
      final java.lang.ClassLoader cl = getClassLoader();
-   	...
+     ...
      // 创建ContextImpl对象
      ContextImpl appContext = ContextImpl.createAppContext(mActivityThread, this);
      // 创建Application对象
@@ -129,10 +129,10 @@ private void handleBindApplication(AppBindData data) {
      appContext.setOuterContext(app);
      ...
      // 将新创建的app添加进ActivityThread
-   	mActivityThread.mAllApplications.add(app); 
+     mActivityThread.mAllApplications.add(app); 
      mApplication = app; 
      ...
-   	return app;
+     return app;
    }
    ```
 
@@ -147,7 +147,7 @@ private void handleBindApplication(AppBindData data) {
      if (packageInfo == null) throw new IllegalArgumentException("packageInfo");
      ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null, null, null, null,
                                            0, null, opPackageName);
-   	...
+     ...
      return context;
    }
    ```
@@ -193,7 +193,7 @@ private void handleBindApplication(AppBindData data) {
 ```java
 // Instrumentation
 public void callApplicationOnCreate(Application app) {
-	app.onCreate();	
+  app.onCreate();	
 }
 ```
 
@@ -225,14 +225,14 @@ private Activity performLaunchActivity(ActivityClientRecord r, Intent customInte
   ContextImpl appContext = createBaseContextForActivity(r);
   Activity activity = null;
   // 获取类加载器
-	java.lang.ClassLoader cl = appContext.getClassLoader();
+  java.lang.ClassLoader cl = appContext.getClassLoader();
   // 获取Instrumentation并创建Activity对象
   activity = mInstrumentation.newActivity(cl, component.getClassName(), r.intent);
   ...
   // 获取Application对象，之前已创建，无须再次创建
   Application app = r.packageInfo.makeApplication(false, mInstrumentation);
   if (activity != null) {
-  	appContext.setOuterContext(activity);
+    appContext.setOuterContext(activity);
     // 将ContextImpl、Application等对象attach到新创建的Activity中
     activity.attach(appContext, this, getInstrumentation(), r.token,
                     r.ident, app, r.intent, r.activityInfo, title, r.parent,
@@ -283,7 +283,7 @@ private Activity performLaunchActivity(ActivityClientRecord r, Intent customInte
      ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null,
                                            activityInfo.splitName, activityToken, null, 0, 
                                            classLoader, null);
-   	...
+     ...
      return context;
    }
    ```
@@ -324,7 +324,7 @@ private Activity performLaunchActivity(ActivityClientRecord r, Intent customInte
                      NonConfigurationInstances lastNonConfigurationInstances,
                      Configuration config, String referrer, IVoiceInteractor voiceInteractor,
                      Window window, ActivityConfigCallback activityConfigCallback, IBinder assistToken) {
-   	attachBaseContext(context);
+     attachBaseContext(context);
      ...
    }
    ```
@@ -358,7 +358,7 @@ private Activity performLaunchActivity(ActivityClientRecord r, Intent customInte
    }
    
    protected void onCreate(@Nullable Bundle savedInstanceState) {
-   	...
+     ...
    }
    ```
 
@@ -463,7 +463,7 @@ private Intent registerReceiverInternal(BroadcastReceiver receiver, int userId,
 public IIntentReceiver getReceiverDispatcher(BroadcastReceiver r,
                                              Context context, Handler handler,
                                              Instrumentation instrumentation, boolean registered) {
-	synchronized (mReceivers) {
+  synchronized (mReceivers) {
     LoadedApk.ReceiverDispatcher rd = null;
     ArrayMap<BroadcastReceiver, LoadedApk.ReceiverDispatcher> map = null;
     if (registered) {
