@@ -478,9 +478,10 @@ bundletool build-apks --bundle=/MyApp/my_app.aab --output=/MyApp/my_app.apks
 ```Kotlin
 abstract class BundleToApkTask : NonIncrementalTask() {
     override fun doTaskAction() {
-    workerExecutor.noIsolation().submit(BundleToolRunnable::class.java) {
-        it.bundleFile.set(bundle)
-        ...
+    		workerExecutor.noIsolation().submit(BundleToolRunnable::class.java) {
+        	it.bundleFile.set(bundle)
+        	...
+        }
     }
     
     abstract class BundleToolRunnable : ProfileAwareWorkAction<Params>() {
@@ -510,7 +511,7 @@ abstract class BundleToApkTask : NonIncrementalTask() {
 ```Kotlin
 // ModuleSplitter
 private ImmutableList<ModuleSplit> splitModuleInternal() {
-  	// 走进runSplitters方法
+    // 走进runSplitters方法
     Stream var10000 = this.runSplitters().stream();
     ...
     return this.stampSource.isPresent() ? (ImmutableList)moduleSplits.stream().map((moduleSplit) -> {
@@ -519,7 +520,7 @@ private ImmutableList<ModuleSplit> splitModuleInternal() {
 }
 
 private ImmutableList<ModuleSplit> runSplitters() {
-  	...
+    ...
     Builder<ModuleSplit> splits = ImmutableList.builder();
     SplittingPipeline resourcesPipeline = this.createResourcesSplittingPipeline();
     splits.addAll(resourcesPipeline.split(ModuleSplit.forResources(this.module, this.variantTargeting)));
@@ -733,7 +734,7 @@ public void installApks(ImmutableList<Path> apks, InstallOptions installOptions)
         } else {
             this.device.installPackage(((File)Iterables.getOnlyElement(apkFiles)).toString(), installOptions.getAllowReinstall(), (String[])extraArgs.build().toArray(new String[0]));
         }
-       ...
+        ...
     }
 }
 
