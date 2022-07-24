@@ -14,7 +14,9 @@ tags: [Android开发框架]
 
 ![AppBundle流程图1](../assets/img/AppBundle1.png)
 
-![AppBundle流程图2](../assets/img/AppBundle2.mp4)
+```HTML
+<video src="../assets/img/AppBundle2.mp4" controls="controls" width="500" height="300"></video>
+```
 
 另外，`Google Play`还提供了`Play Feature Delivery`（动态交付）的高级能力。
 
@@ -1031,5 +1033,3 @@ public void updateApplicationInfo(@NonNull ApplicationInfo aInfo,
 ```
 
 可以看到，最终会调用`LoadedApk的updateApplicationInfo`方法，还是会走`Split Apks`那套逻辑。
-
-- 
