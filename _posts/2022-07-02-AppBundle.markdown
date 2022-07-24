@@ -18,6 +18,13 @@ tags: [Android开发框架]
 <video src="../assets/img/AppBundle2.mp4" controls="controls" width="500" height="300"></video>
 ```
 
+```html
+<video width="320" controls loop>
+  <source src="../assets/img/AppBundle2.mp4" type="video/mp4">
+  <p>AppBundle</p>
+</video>
+```
+
 另外，`Google Play`还提供了`Play Feature Delivery`（动态交付）的高级能力。
 
 `Play Feature Delivery`的独特优势在于，能够自定义如何以及何时将应用的不同功能下载到搭载 `Android 5.0`（API 级别 21）或更高版本的设备上。例如，为了减小应用的初始下载大小，可以将某些功能模块配置为按需下载，或者只能由支持特定功能（比如拍照或AR）的设备下载。
