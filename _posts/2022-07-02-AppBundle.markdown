@@ -14,26 +14,7 @@ tags: [Android开发框架]
 
 ![AppBundle流程图1](../assets/img/AppBundle1.png)
 
-```HTML
-<video src="../assets/img/AppBundle2.mp4" controls="controls" width="500" height="300"></video>
-```
-
-```html
-<video width="320" controls loop>
-  <source src="../assets/img/AppBundle2.mp4" type="video/mp4">
-  <p>AppBundle</p>
-</video>
-```
-
-```html
-<iframe 
-    src="../assets/img/AppBundle2.mp4"
-    width="800" 
-    height="450" 
-    frameborder="0" 
-    allowfullscreen>
-</iframe>
-```
+<video src="../assets/img/AppBundle2.mp4"  controls loop ></video>
 
 另外，`Google Play`还提供了`Play Feature Delivery`（动态交付）的高级能力。
 
