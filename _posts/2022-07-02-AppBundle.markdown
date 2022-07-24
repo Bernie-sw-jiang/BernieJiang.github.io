@@ -932,7 +932,7 @@ public Resources getResources() {
         } catch (NameNotFoundException e) {
             ...
         }
-				// 将splitPaths传入Resources
+        // 将splitPaths传入Resources
         mResources = ResourcesManager.getInstance().getResources(null, mResDir,
                 splitPaths, mOverlayDirs, mApplicationInfo.sharedLibraryFiles,
                 Display.DEFAULT_DISPLAY, null, getCompatibilityInfo(),
