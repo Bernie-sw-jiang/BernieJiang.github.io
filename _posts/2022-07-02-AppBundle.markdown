@@ -14,7 +14,7 @@ tags: [Android开发框架]
 
 ![AppBundle流程图1](../assets/img/AppBundle1.png)
 
-<video src="../assets/img/AppBundle2.mp4"  controls loop ></video>
+<video src="../assets/img/AppBundle2.mp4" autoplay="autoplay" controls loop ></video>
 
 另外，`Google Play`还提供了`Play Feature Delivery`（动态交付）的高级能力。
 
