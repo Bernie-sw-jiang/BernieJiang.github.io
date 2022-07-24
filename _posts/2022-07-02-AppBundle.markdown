@@ -495,7 +495,6 @@ abstract class BundleToApkTask : NonIncrementalTask() {
         }
     }
 }
-}
 ```
 
 `BundleToApkTask`任务，最后也会委托给`bundleTool`中的[`BuildApksCommand`](https://github.com/google/bundletool/blob/master/src/main/java/com/android/tools/build/bundletool/commands/BuildApksCommand.java)类。
@@ -514,7 +513,7 @@ private ImmutableList<ModuleSplit> splitModuleInternal() {
   	// 走进runSplitters方法
     Stream var10000 = this.runSplitters().stream();
     ...
-		return this.stampSource.isPresent() ? (ImmutableList)moduleSplits.stream().map((moduleSplit) -> {
+    return this.stampSource.isPresent() ? (ImmutableList)moduleSplits.stream().map((moduleSplit) -> {
         return moduleSplit.writeSourceStampInManifest((String)this.stampSource.get(), this.stampType);
     }).collect(ImmutableList.toImmutableList()) : moduleSplits;
 }
@@ -542,7 +541,7 @@ private ImmutableList<ModuleSplit> runSplitters() {
 // SameTargetingMerger
 public ImmutableList<ModuleSplit> merge(ImmutableCollection<ModuleSplit> moduleSplits) {
     Builder<ModuleSplit> result = ImmutableList.builder();
-  	// 根据ModuleSplit::getApkTargeting对所有资源进行拆分
+    // 根据ModuleSplit::getApkTargeting对所有资源进行拆分
     ImmutableListMultimap<ApkTargeting, ModuleSplit> splitsByTargeting = Multimaps.index(moduleSplits, ModuleSplit::getApkTargeting);
     UnmodifiableIterator var4 = splitsByTargeting.keySet().iterator();
 
@@ -619,7 +618,7 @@ public void execute() {
         if (this.getDeviceGroups().isPresent()) {
             deviceSpec = deviceSpec.toBuilder().addAllDeviceGroups((Iterable)this.getDeviceGroups().get()).build();
         }
-				// 挑选与设备匹配的Split Apk
+        // 挑选与设备匹配的Split Apk
         ImmutableList<Path> apksToInstall = this.getApksToInstall(toc, deviceSpec, tempDirectory.getPath());
         ImmutableList<Path> filesToPush = ImmutableList.builder().addAll(this.getApksToPushToStorage(toc, deviceSpec, tempDirectory.getPath())).addAll((Iterable)this.getAdditionalLocalTestingFiles().orElse(ImmutableList.of())).build();
         AdbRunner adbRunner = new AdbRunner(adbServer);
