@@ -87,82 +87,85 @@ android {
 3. 点击`Finish`后
 
    1. `app/build.gradle`文件会新增如下代码
-      1. ```Groovy
-         android {
-             dynamicFeatures = [':DFMoudle']
-         }
-         ```
+      
+      ```Groovy
+      android {
+          dynamicFeatures = [':DFMoudle']
+      }
+      ```
    2. `Dynamic Feature Module`的`AndroidManifest`文件会新增如下代码
-      1. ```xml
-         <?xml version="1.0" encoding="utf-8"?>
-         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-             xmlns:dist="http://schemas.android.com/apk/distribution"
-             package="com.bytedance.dfmoudle1">
-         
-             <dist:module
-                 // 支持免安装体验
-                 dist:instant="false"
-                 dist:title="@string/title_dfmoudle1">
-                 // 1.安装时下载
-                 <dist:delivery>
-                     <dist:install-time />
-                 </dist:delivery>
-                 // 2.按需下载
-                 <dist:delivery>
-                     <dist:on-demand />
-                 </dist:delivery>
-                 // 3.按条件下载
-                 <dist:delivery>
-                     <dist:install-time>
-                         <dist:conditions>
-                             <dist:user-countries dist:include="true">
-                                 <dist:country dist:code="BR" />
-                                 <dist:country dist:code="ID" />
-                             </dist:user-countries>
-                         </dist:conditions>
-                     </dist:install-time>
-                  </dist:delivery>
-                  // Android 5.0以下融合安装
-                  <dist:fusing dist:include="true" />
-             </dist:module>
-             
-         </manifest>
-         ```
+      
+      ```xml
+      <?xml version="1.0" encoding="utf-8"?>
+      <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:dist="http://schemas.android.com/apk/distribution"
+          package="com.bytedance.dfmoudle1">
+      
+          <dist:module
+              // 支持免安装体验
+              dist:instant="false"
+              dist:title="@string/title_dfmoudle1">
+              // 1.安装时下载
+              <dist:delivery>
+                  <dist:install-time />
+              </dist:delivery>
+              // 2.按需下载
+              <dist:delivery>
+                  <dist:on-demand />
+              </dist:delivery>
+              // 3.按条件下载
+              <dist:delivery>
+                  <dist:install-time>
+                      <dist:conditions>
+                          <dist:user-countries dist:include="true">
+                              <dist:country dist:code="BR" />
+                              <dist:country dist:code="ID" />
+                          </dist:user-countries>
+                      </dist:conditions>
+                  </dist:install-time>
+               </dist:delivery>
+               // Android 5.0以下融合安装
+               <dist:fusing dist:include="true" />
+          </dist:module>
+      </manifest>
+      ```
 
 #### [下载按需模块/语言资源](https://developer.android.com/guide/playcore/play-feature-delivery?hl=zh-cn#access_downloaded_modules)
 
-按需下载的模块需要手动触发下载。
+按需下载的模块需要手动触发下载：
 
 1. `app/build.gradle`添加`Play Core`库
-   1. ```groovy
-      implementation "com.google.android.play:core:${versions}"
-      ```
+   
+   ```groovy
+   implementation "com.google.android.play:core:${versions}"
+   ```
+   
 2. 请求按需模块/语言资源
 
-1. 1. ```Kotlin
-      // 请求按需模块
-      val splitInstallManager = SplitInstallManagerFactory.create(context)
-      val request = SplitInstallRequest
-              .newBuilder()
-              .addModule("pictureMessages")
-              .build()
-      
-      splitInstallManager
-          .startInstall(request)
-          .addOnSuccessListener { sessionId -> ... }
-          .addOnFailureListener { exception ->  ... }
-          
-      // 请求语言资源
-      val request = SplitInstallRequest
-              .newBuilder()
-              .addLanguage(Locale.forLanguageTag(lang))
-              .build()
-      
-      splitInstallManager
-          .startInstall(request)
-          .addOnSuccessListener { sessionId -> ... }
-          .addOnFailureListener { exception ->  ... }
-      ```
+   ```Kotlin
+   // 请求按需模块
+   val splitInstallManager = SplitInstallManagerFactory.create(context)
+   val request = SplitInstallRequest
+           .newBuilder()
+           .addModule("pictureMessages")
+           .build()
+   
+   splitInstallManager
+       .startInstall(request)
+       .addOnSuccessListener { sessionId -> ... }
+       .addOnFailureListener { exception ->  ... }
+       
+   // 请求语言资源
+   val request = SplitInstallRequest
+           .newBuilder()
+           .addLanguage(Locale.forLanguageTag(lang))
+           .build()
+   
+   splitInstallManager
+       .startInstall(request)
+       .addOnSuccessListener { sessionId -> ... }
+       .addOnFailureListener { exception ->  ... }
+   ```
 
 #### [访问`Dynamic Feature Mudule`](https://developer.android.com/guide/playcore/play-feature-delivery?hl=zh-cn#access_downloaded_modules)
 
