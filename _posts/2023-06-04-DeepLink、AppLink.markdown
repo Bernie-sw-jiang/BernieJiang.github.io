@@ -42,7 +42,7 @@ AppLink可以带来以下好处：
 
 以下 XML 代码段展示了如何在清单中为DeepLink指定`intent-filter`。URI `example://gizmos` 和 `http://www.example.com/gizmos` 都会解析到此`Activity`。
 
-```XML
+```xml
 <activity
     android:name="com.example.android.GizmosActivity"
     android:label="@string/title_gizmos" >
@@ -72,7 +72,7 @@ AppLink可以带来以下好处：
 
 注意，`<data>`元素是这两个`intent-filter`的唯一区别。虽然同一过滤器可以包含多个 `<data>` 元素，但如果想要声明唯一网址（例如特定的 `scheme` 和 `host` 组合），则创建单独的过滤器很重要，因为同一`intent-filter`中的多个`<data>`元素实际上会合并在一起以涵盖合并后属性的所有变体。
 
-```XML
+```xml
     <intent-filter>
       ...
       <data android:scheme="https" android:host="www.example.com" />
@@ -92,7 +92,7 @@ AppLink可以带来以下好处：
    
    在应用清单中的任一网址`intent-filter`中设置 `android:autoVerify="true"`。这样即可向Android系统说明其应该验证你的应用是否属于`intent-filter`中使用的网址网域。
    
-   ```XML
+   ```xml
    <activity ...>
         <intent-filter android:autoVerify="true">
             <action android:name="android.intent.action.VIEW" />
@@ -118,13 +118,16 @@ AppLink可以带来以下好处：
       1.   JSON文件使用下列字段标识关联的应用：
 
       2. `package_name`：在应用的`build.gradle`文件中声明的应用 ID。
+      
       3. `sha256_cert_fingerprints`：应用的签名证书的SHA256指纹。可以利用 Java 密钥工具，通过以下命令生成该指纹：
-      4. ```XML
-          $ keytool -list -v -keystore my-release-key.keystore
-         ```
-
-      5. 以下`assetlinks.json`示例文件可为`com.example`应用授予链接打开权限：
-      6. ```JSON
+      
+           ```
+           $ keytool -list -v -keystore my-release-key.keystore
+           ```
+      
+      4. 以下`assetlinks.json`示例文件可为`com.example`应用授予链接打开权限：
+      
+           ```
            [{
              "relation": ["delegate_permission/common.handle_all_urls"],
              "target": {
@@ -134,12 +137,11 @@ AppLink可以带来以下好处：
                ["14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5"]
              }
            }]
-           
-         ```
+           ```
 
 ### DeepLink跳转
 
-```Kotlin
+```kotlin
 val intent = Intent(Intent.ACTION_VIEW)
 intent.addCategory(Intent.CATEGORY_BROWSABLE)
 intent.addCategory(Intent.CATEGORY_DEFAULT)
@@ -149,7 +151,7 @@ startActivity(intent)
 
 ### 测试
 
-```XML
+```
 $ adb shell am start
         -W -a android.intent.action.VIEW
         -d <URI>
@@ -159,7 +161,7 @@ $ adb shell am start
 
 从`Activity.startActivity`方法开始看起
 
-```Java
+```java
 // Activity
 @Override
 public void startActivity(Intent intent) {
@@ -199,7 +201,7 @@ public void startActivityForResult(@RequiresPermission Intent intent, int reques
 
 走进`Instrumentation.execStartActivity`方法
 
-```Java
+```java
 // Instrumentation
 @UnsupportedAppUsage
 public ActivityResult execStartActivity(
@@ -221,7 +223,7 @@ public ActivityResult execStartActivity(
 
 继续走进`ActivityTaskManagerService.startActivity`方法
 
-```Java
+```java
 // ActivityTaskManagerService
 @Override
 public final int startActivity(IApplicationThread caller, String callingPackage,
@@ -264,7 +266,7 @@ int startActivityAsUser(IApplicationThread caller, String callingPackage,
 
 继续走到`ActivityStarter.execute`方法
 
-```Java
+```java
 // ActivityStarter
 int execute() {
     ...
@@ -313,7 +315,7 @@ private int startActivityMayWait(IApplicationThread caller, int callingUid,
 
 核心逻辑在`ActivityStackSupervisor.resolveIntent`方法里
 
-```Java
+```java
 // ActivityStackSupervisor
 ResolveInfo resolveIntent(Intent intent, String resolvedType, int userId, int flags,
         int filterCallingUid) {
@@ -330,7 +332,7 @@ ResolveInfo resolveIntent(Intent intent, String resolvedType, int userId, int fl
 
 继续走进`PackageManagerService.resolveIntent`方法
 
-```Java
+```java
 // PackageManagerService
 @Override
 public ResolveInfo resolveIntent(Intent intent, String resolvedType,
@@ -357,7 +359,7 @@ private ResolveInfo resolveIntentInternal(Intent intent, String resolvedType,
 
 ### `PackageManagerService.queryIntentActivitiesInternal`
 
-```Java
+```java
 // PackageManagerService
 private @NonNull List<ResolveInfo> queryIntentActivitiesInternal(Intent intent,
         String resolvedType, int flags, int filterCallingUid, int userId,
@@ -415,7 +417,7 @@ private @NonNull List<ResolveInfo> queryIntentActivitiesInternal(Intent intent,
 
 #### `intent.getPackage() == null`
 
-```Java
+```java
 // ComponentResolver
 List<ResolveInfo> queryActivities(Intent intent, String resolvedType, int flags, int userId) {
     synchronized (mLock) {
@@ -565,7 +567,7 @@ private final ArrayMap<String, F[]> mTypedActionToFilter = new ArrayMap<String, 
 
 到此得到了最多四个数组`firstTypeCut`、`secondTypeCut`、`thirdTypeCut`、`schemeCut`，这四个数组还需进行一轮匹配，具体匹配规则在`buildResolveList`方法中，我们继续往下看
 
-```Java
+```java
 // IntentResolver
 private void buildResolveList(Intent intent, FastImmutableArraySet<String> categories,
         boolean debug, boolean defaultOnly, String resolvedType, String scheme,
@@ -703,7 +705,7 @@ public final String matchCategories(Set<String> categories) {
 
 到此，便找到了所有满足条件的`Activity`，根据优先级排个序后便返回结果。
 
-```Java
+```java
 // IntentResolver
 protected void sortResults(List<R> results) {
     Collections.sort(results, mResolvePrioritySorter);
@@ -720,7 +722,7 @@ private static final Comparator mResolvePrioritySorter = new Comparator() {
 
 #### `intent.getPackage() != null`
 
-```Java
+```java
 // ComponentResolver
 List<ResolveInfo> queryIntentForPackage(Intent intent, String resolvedType,
         int flags, List<PackageParser.Activity> packageActivities, int userId) {
@@ -763,7 +765,7 @@ public List<R> queryIntentFromList(Intent intent, String resolvedType, boolean d
 
 ### `PackageManagerService.chooseBestActivity`
 
-```Java
+```java
 private ResolveInfo chooseBestActivity(Intent intent, String resolvedType,
         int flags, List<ResolveInfo> query, int userId) {
     if (query != null) {
