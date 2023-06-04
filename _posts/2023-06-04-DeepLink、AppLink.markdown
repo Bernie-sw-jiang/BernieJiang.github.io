@@ -7,15 +7,15 @@ tags: [Android源码解读]
 ---
 Deeplink深层链接
 
-### 定义
+## 定义
 
-#### DeepLink
+### DeepLink
 
 DeepLink是指将用户直接转到应用app中的特定内容的网址。在Android中，可以通过添加`intent-filter`来设置DeepLink，以便将用户吸引到正确的`Activity`。不过，如果用户设备上安装的其他应用可以处理相同的`intent`，则用户可能无法直接进入您的应用。例如，点击银行发来的电子邮件中的网址可能会显示一个对话框，询问用户是使用浏览器还是银行自己的应用打开此链接。
 
 - eg.`snssdk1233://aweme/detail/12345678`
 
-#### AppLink
+### AppLink
 
 AppLink是一种特殊类型的DeepLink，在Android 6.0及更高版本中可以使用。AppLink能使应用将自己指定为给定类型链接的默认处理程序，从而绕过应用选择对话框。如果用户不想使用某个应用作为默认处理程序，则可以从设备的系统设置中替换此行为。
 
@@ -26,9 +26,9 @@ AppLink可以带来以下好处：
 - **Android 免安装应用支持**：借助Android免安装应用，用户无需安装即可运行Android应用。
 - **通过 Google 搜索吸引用户**：用户可以通过在移动浏览器、Google搜索应用、Android中的屏幕搜索或通过 Google 助理点击来自Google的网址，直接打开应用中的特定内容。
 
-### 使用方式
+## 使用方式
 
-#### 为DeepLink添加`intent-filter`
+### 为DeepLink添加`intent-filter`
 
 如需创建指向应用的DeepLink，须在清单中添加一个包含以下元素和属性值的`intent-filter`：
 
@@ -84,7 +84,7 @@ AppLink可以带来以下好处：
 
 当向应用清单添加包含`Activity`内容URI的`intent-filter`后，Android可以在运行时将所有包含匹配URI的 `Intent` 转发到应用。
 
-#### 验证 AppLink
+### 验证 AppLink
 
 如需向应用添加AppLink，在定义使用HTTP网址打开应用的`intent-filter`之后，还需要验证你是否为相关应用和网站网址的所有者。如果系统成功验证你是网址所有者，则会自动将这些网址`Intent`路由到你的应用。
 
@@ -137,7 +137,7 @@ AppLink可以带来以下好处：
            
          ```
 
-#### DeepLink跳转
+### DeepLink跳转
 
 ```Kotlin
 val intent = Intent(Intent.ACTION_VIEW)
@@ -147,7 +147,7 @@ intent.data = Uri.parse("https://www.example.com")
 startActivity(intent)
 ```
 
-#### 测试
+### 测试
 
 ```XML
 $ adb shell am start
@@ -155,7 +155,7 @@ $ adb shell am start
         -d <URI>
 ```
 
-### 实现原理
+## 实现原理
 
 从`Activity.startActivity`方法开始看起
 
@@ -355,7 +355,7 @@ private ResolveInfo resolveIntentInternal(Intent intent, String resolvedType,
 1. 通过`queryIntentActivitiesInternal`方法找到所有适合的`Activity`
 2. 再通过`chooseBestActivity` 方法选择出最终的`Activity`
 
-#### `PackageManagerService.queryIntentActivitiesInternal`
+### `PackageManagerService.queryIntentActivitiesInternal`
 
 ```Java
 // PackageManagerService
@@ -413,7 +413,7 @@ private @NonNull List<ResolveInfo> queryIntentActivitiesInternal(Intent intent,
 
 后面两种情况Deeplink都有可能走到，我们依次来看。先看没有设置包名的情况
 
-##### `intent.getPackage() == null`
+#### `intent.getPackage() == null`
 
 ```Java
 // ComponentResolver
@@ -718,7 +718,7 @@ private static final Comparator mResolvePrioritySorter = new Comparator() {
 };
 ```
 
-##### `intent.getPackage() != null`
+#### `intent.getPackage() != null`
 
 ```Java
 // ComponentResolver
@@ -761,7 +761,7 @@ public List<R> queryIntentFromList(Intent intent, String resolvedType, boolean d
 
 逻辑很类似，最后依然是调用`buildResolveList`找出匹配的`Activity`。但是是从指定包下的`Activity`列表中查找，相比没有设置包名的情况，大大节省了开销。
 
-#### `PackageManagerService.chooseBestActivity`
+### `PackageManagerService.chooseBestActivity`
 
 ```Java
 private ResolveInfo chooseBestActivity(Intent intent, String resolvedType,
